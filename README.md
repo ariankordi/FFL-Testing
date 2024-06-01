@@ -8,12 +8,12 @@ As of 2024-05-31, I added a Makefile that should more or less "just" work on Lin
     ```
     sudo apt install libglew-dev libglfw3-dev zlib1g-dev libgl1-mesa-dev
     ```
-    You need GLEW, GLFW3, OpenGL, and zlib. You may need to install `ppc-zlib` if you are using WUT, if this even works with that yet.
+    You need GLEW, GLFW3, OpenGL, and zlib. You need to install `ppc-zlib` if you are building with WUT.
 3. Build using the makefile.
     ```
     make -j4
     ```
-    (To try building for WUT, use: `make -f Makefile.wut -j4`)
+    To build for WUT, use: `make -f Makefile.wut -j4`
 3. Obtain required files.
     * You'll need to extract the following folder from a Wii U MLC:
         - `sys/title/0005001b/10056000/content`

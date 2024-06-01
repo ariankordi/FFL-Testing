@@ -15,11 +15,11 @@ RootTask::RootTask()
 {
 }
 
-#ifdef _WIN32
+#if RIO_IS_WIN && defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
-#else
+#elif RIO_IS_WIN
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -31,11 +31,12 @@ RootTask::RootTask()
 
 #include <nn/ffl/FFLiMiiData.h>
 
+#if RIO_IS_WIN
 int server_fd, new_socket;
 struct sockaddr_in address;
 int opt = 1;
 int addrlen = sizeof(address);
-
+#endif
 
 void RootTask::prepare_()
 {
@@ -134,14 +135,14 @@ void RootTask::prepare_()
     }
 
 
-
+    #if RIO_IS_WIN
     #ifdef _WIN32
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
         perror("WSAStartup failed");
         exit(EXIT_FAILURE);
     }
-    #endif
+    #endif // ifdef _WIN32
 
     // Creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -189,6 +190,8 @@ void RootTask::prepare_()
     << "\033[2m(you can change the port with the PORT environment variable)\033[0m\n"
     << "try sending FFLStoreData or FFLiCharInfo (little endian) to it with netcat"
     << std::endl;
+
+    #endif // RIO_IS_WIN
 
     mInitialized = true;
 }
@@ -258,9 +261,9 @@ void RootTask::createModel_(char (*buf)[FFLICHARINFO_SIZE]) {
     std::cout << convert.to_bytes((char16_t*) pCharInfo->name)
         << std::endl;
     // close connection which should happen as soon as we read it
-    #ifdef _WIN32
+    #if RIO_IS_WIN && defined(_WIN32)
         closesocket(new_socket);
-    #else
+    #elif defined(_WIN32)
         close(new_socket);
     #endif
     // otherwise just fall through and use default
@@ -313,6 +316,7 @@ void RootTask::calc_()
     // maximum received is the size of FFLiCharInfo
     char buf[sizeof(FFLiCharInfo)];
 
+    #if RIO_IS_WIN
     if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) > 0) {
         // Assuming data directly received is FFLStoreData
         ssize_t read_bytes =
@@ -334,12 +338,15 @@ void RootTask::calc_()
         #endif
         // otherwise just fall through and use default
         // when mii is directly in front of the camera
+    #endif // RIO_IS_WIN
         if (mCounter >= rio::Mathf::pi2())
         {
             delete mpModel;
             createModel_();
         }
+    #if RIO_IS_WIN
     }
+    #endif
 
     static const rio::Vector3f CENTER_POS = { 0.0f, 2.0f, -0.25f };
 
@@ -378,7 +385,7 @@ void RootTask::exit_()
     FFLExit();
 
     rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_HIGH]);
-    //rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE]);
+    rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE]);
 
     mInitialized = false;
 }

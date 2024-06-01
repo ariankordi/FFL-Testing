@@ -18,6 +18,8 @@ ifeq ($(shell uname), Darwin)
     EXEC := ffl_testing_2_debug_apple
 endif
 
+# TODO: add options for asan and no clip control
+
 CXXFLAGS += -g -std=c++17 $(INCLUDES) $(DEFS)
 
 # Source directories
@@ -55,3 +57,6 @@ clean:
 # Phony targets
 .PHONY: all clean
 
+# Mode for chainloading Makefile.wut
+wut:
+	$(MAKE) -f Makefile.wut

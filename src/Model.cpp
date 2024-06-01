@@ -25,9 +25,10 @@ Model::~Model()
     }
 }
 
-void Model::initialize_(const FFLCharModelDesc* p_desc)
+void Model::initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource* p_source)
 {
     mCharModelDesc = *p_desc;
+    mCharModelSource = *p_source;
 }
 
 void Model::updateMtxSRT_()
@@ -163,7 +164,12 @@ void Model::drawXluSpecial_()
 
 bool Model::initializeCpu_()
 {
-    return FFLInitCharModelCPUStep(&mCharModel, &mCharModelSource, &mCharModelDesc) == FFL_RESULT_OK;
+    FFLResult initCharModelResult = FFLInitCharModelCPUStep(&mCharModel, &mCharModelSource, &mCharModelDesc);
+    if (initCharModelResult != FFL_RESULT_OK) {
+        RIO_LOG("FFLInitCharModelCPUStep returned: %i\n", initCharModelResult);
+        return false;
+    }
+    return true;
 }
 
 void Model::initializeGpu_(const Shader& shader)
@@ -172,22 +178,4 @@ void Model::initializeGpu_(const Shader& shader)
     mpShader->bind();
     FFLInitCharModelGPUStep(&mCharModel);
     rio::Window::instance()->makeContextCurrent();
-}
-
-bool Model::setCharModelSource_(const FFLStoreData* p_store_data, u16)
-{
-    mCharModelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
-    mCharModelSource.pBuffer = p_store_data;
-    mCharModelSource.index = 0;
-
-    return initializeCpu_();
-}
-
-bool Model::setCharModelSource_(const FFLMiddleDB* p_middle_db, u16 index)
-{
-    mCharModelSource.pBuffer = p_middle_db;
-    mCharModelSource.index = index;
-    mCharModelSource.dataSource = FFL_DATA_SOURCE_MIDDLE_DB;
-
-    return initializeCpu_();
 }

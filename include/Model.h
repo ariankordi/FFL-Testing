@@ -13,7 +13,7 @@ public:
     struct InitArg
     {
         FFLCharModelDesc    desc;
-        const T*            data;
+        FFLCharModelSource  source;
         u16                 index;
     };
 
@@ -65,12 +65,9 @@ private:
     void drawXluNormal_();
     void drawXluSpecial_();
 
-    void initialize_(const FFLCharModelDesc* p_desc);
+    void initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource* p_source);
     bool initializeCpu_();
     void initializeGpu_(const Shader& shader);
-
-    bool setCharModelSource_(const FFLStoreData* p_store_data, u16);
-    bool setCharModelSource_(const FFLMiddleDB* p_middle_db, u16 index);
 
 private:
     FFLCharModel        mCharModel;
@@ -89,9 +86,9 @@ bool Model::initialize(const InitArg<T>& arg, const Shader& shader)
 {
     RIO_ASSERT(mIsInitialized == false);
 
-    initialize_(&arg.desc);
+    initialize_(&arg.desc, &arg.source);
 
-    if (!setCharModelSource_(arg.data, arg.index))
+    if (!initializeCpu_())
         return false;
 
     initializeGpu_(shader);

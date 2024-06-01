@@ -8,6 +8,6 @@ out vec4 FragColor;
 
 void main()
 {
-    vec3 col = texture(screenTexture, TexCoords).rgb;
-    FragColor = vec4(col, 1.0);
+    vec4 texColor = texture(screenTexture, TexCoords);
+    FragColor = vec4(texColor.rgb, texColor.a);
 }

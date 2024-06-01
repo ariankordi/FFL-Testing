@@ -1,0 +1,1 @@
+make CXX=x86_64-w64-mingw32-g++ LDFLAGS+="-L/dev/shm/glfw/build/src/ -L/dev/shm/glew/lib/ -lglew32 -lglfw3 -lopengl32 -lws2_32 -lz -lgdi32" INCLUDES+=" -I/dev/shm/glew/include -I/dev/shm/glfw/include -IninTexUtils/include -Irio/include -Iffl/include -Iinclude" -j8

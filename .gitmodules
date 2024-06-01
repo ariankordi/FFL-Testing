@@ -1,0 +1,12 @@
+[submodule "rio"]
+	path = rio
+	url = https://github.com/ariankordi/rio
+	shallow = true
+[submodule "ninTexUtils"]
+	path = ninTexUtils
+	url = https://github.com/ariankordi/ninTexUtils
+	shallow = true
+[submodule "ffl"]
+	path = ffl
+	url = https://github.com/ariankordi/ffl
+	shallow = true

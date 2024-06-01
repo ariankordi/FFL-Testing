@@ -43,3 +43,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# binaries
+ffl_testing_2_debug*
+# mlc
+sys/
+usr/

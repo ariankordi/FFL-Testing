@@ -1,205 +1,57 @@
-#-------------------------------------------------------------------------------
-.SUFFIXES:
-#-------------------------------------------------------------------------------
+# Compiler and flags
+CXX := g++
+INCLUDES := -IninTexUtils/include -Irio/include -Iffl/include -Iinclude
+LDFLAGS := -lz -lGL -lGLEW
+# found that glfw3 is different on some systems
+LDFLAGS += $(shell pkg-config --libs glfw3)
 
-ifeq ($(strip $(DEVKITPRO)),)
-$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
+DEFS := -DFFL_MLC_PATH="\"./\"" -DRIO_DEBUG -DNDEBUG -DFFL_NO_OPEN_DATABASE -DFFL_TEST_DISABLE_MII_COLOR_VERIFY
+
+# Executable
+EXEC := ffl_testing_2_debug64
+
+# OS-specific settings
+ifeq ($(shell uname), Darwin)
+    # macOS-specific flags
+    INCLUDES += -I/opt/homebrew/include
+    LDFLAGS += -L/opt/homebrew/lib -framework OpenGL -framework Foundation -framework CoreGraphics -framework AppKit -framework IOKit
+    EXEC := ffl_testing_2_debug_apple
 endif
 
-TOPDIR ?= $(CURDIR)
+CXXFLAGS += -g -std=c++17 $(INCLUDES) $(DEFS)
 
-#-------------------------------------------------------------------------------
-# APP_NAME sets the long name of the application
-# APP_SHORTNAME sets the short name of the application
-# APP_AUTHOR sets the author of the application
-#-------------------------------------------------------------------------------
-#APP_NAME	:= Application Name
-#APP_SHORTNAME	:= App Name
-#APP_AUTHOR	:= Built with devkitPPC & wut
+# Source directories
+NINTEXUTILS_SRC := $(shell find ninTexUtils/src/ninTexUtils -name '*.c' -o -name '*.cpp')
+RIO_SRC := $(shell find rio/src -name '*.c' -o -name '*.cpp')
+FFL_SRC := $(shell find ffl/src -name '*.c' -o -name '*.cpp')
+MAIN_SRC := $(wildcard ./**/*.cpp)
 
-include $(DEVKITPRO)/wut/share/wut_rules
+# Object files
+NINTEXUTILS_OBJ := $(NINTEXUTILS_SRC:.c=.o)
+NINTEXUTILS_OBJ := $(NINTEXUTILS_OBJ:.cpp=.o)
+RIO_OBJ := $(RIO_SRC:.cpp=.o)
+FFL_OBJ := $(FFL_SRC:.cpp=.o)
+MAIN_OBJ := $(MAIN_SRC:.cpp=.o)
 
-#-------------------------------------------------------------------------------
-# TARGET is the name of the output
-# BUILD is the directory where object files & intermediate files will be placed
-# SOURCES is a list of directories containing source code
-# DATA is a list of directories containing data files
-# INCLUDES is a list of directories containing header files
-# CONTENT is the path to the bundled folder that will be mounted as /vol/content/
-# ICON is the game icon, leave blank to use default rule
-# TV_SPLASH is the image displayed during bootup on the TV, leave blank to use default rule
-# DRC_SPLASH is the image displayed during bootup on the DRC, leave blank to use default rule
-#-------------------------------------------------------------------------------
-TARGET		:=	ffl_testing_2_debug
-BUILD		:=	build
-SOURCES		:=	../../rio/src \
-				../../rio/src/audio \
-				../../rio/src/container \
-				../../rio/src/controller \
-				../../rio/src/controller/cafe \
-				../../rio/src/filedevice \
-				../../rio/src/filedevice/cafe \
-				../../rio/src/gfx \
-				../../rio/src/gfx/cafe \
-				../../rio/src/gfx/lyr \
-				../../rio/src/gfx/mdl \
-				../../rio/src/gfx/mdl/res \
-				../../rio/src/gpu \
-				../../rio/src/gpu/cafe \
-				../../rio/src/math \
-				../../rio/src/math/impl \
-				../../rio/src/task \
-				src \
-				../../NSMBU_Projects/ffl-Win-Port/src \
-				../../NSMBU_Projects/ffl-Win-Port/src/detail
-DATA		:=	data
-INCLUDES	:=	../../rio/include \
-				include \
-				../../NSMBU_Projects/ffl-Win-Port/include
-CONTENT		:=	fs/content
-ICON		:=
-TV_SPLASH	:=
-DRC_SPLASH	:=
+# Default target
+all: $(EXEC)
+# TODO: add git submodule update --init --recursive
 
-#-------------------------------------------------------------------------------
-# options for code generation
-#-------------------------------------------------------------------------------
-CFLAGS	:=	-Wall -Wmissing-include-dirs -Wundef -Wredundant-decls -Wcast-align \
-			-Og -g \
-			-ffunction-sections -fdata-sections \
-			$(MACHDEP)
+# Linking the executable
+$(EXEC): $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(MAIN_OBJ)
+	$(CXX) $^ -o $@ $(CXXFLAGS) $(LDFLAGS)
 
-CFLAGS	+=	$(INCLUDE) -D__WIIU__ -D__WUT__ \
-			-DRIO_DEBUG \
-			-DRIO_CAFE_MAIN_FILE_DEVICE_AS_CONTENT
+# Compiling source files
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-CXXFLAGS	:= $(CFLAGS) -std=c++17
+%.o: %.c
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map)
-
-LIBS	:= -lwut -lz
-
-#-------------------------------------------------------------------------------
-# list of directories containing libraries, this must be the top level
-# containing include and lib
-#-------------------------------------------------------------------------------
-LIBDIRS	:= $(WUT_ROOT) $(PORTLIBS)
-
-#-------------------------------------------------------------------------------
-# no real need to edit anything past this point unless you need to add additional
-# rules for different file extensions
-#-------------------------------------------------------------------------------
-ifneq ($(BUILD),$(notdir $(CURDIR)))
-#-------------------------------------------------------------------------------
-
-export OUTPUT	:=	$(CURDIR)/fs/code/$(TARGET)
-export TOPDIR	:=	$(CURDIR)
-
-export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(DATA),$(CURDIR)/$(dir))
-
-export DEPSDIR	:=	$(CURDIR)/$(BUILD)
-
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
-SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
-
-#-------------------------------------------------------------------------------
-# use CXX for linking C++ projects, CC for standard C
-#-------------------------------------------------------------------------------
-ifeq ($(strip $(CPPFILES)),)
-#-------------------------------------------------------------------------------
-	export LD	:=	$(CC)
-#-------------------------------------------------------------------------------
-else
-#-------------------------------------------------------------------------------
-	export LD	:=	$(CXX)
-#-------------------------------------------------------------------------------
-endif
-#-------------------------------------------------------------------------------
-
-export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
-export OFILES_SRC	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-export OFILES 	:=	$(OFILES_BIN) $(OFILES_SRC)
-export HFILES_BIN	:=	$(addsuffix .h,$(subst .,_,$(BINFILES)))
-
-export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
-			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-			-I$(CURDIR)/$(BUILD)
-
-export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-
-ifneq (,$(strip $(CONTENT)))
-	export APP_CONTENT := $(TOPDIR)/$(CONTENT)
-endif
-
-ifneq (,$(strip $(ICON)))
-	export APP_ICON := $(TOPDIR)/$(ICON)
-else ifneq (,$(wildcard $(TOPDIR)/$(TARGET).png))
-	export APP_ICON := $(TOPDIR)/$(TARGET).png
-else ifneq (,$(wildcard $(TOPDIR)/icon.png))
-	export APP_ICON := $(TOPDIR)/icon.png
-endif
-
-ifneq (,$(strip $(TV_SPLASH)))
-	export APP_TV_SPLASH := $(TOPDIR)/$(TV_SPLASH)
-else ifneq (,$(wildcard $(TOPDIR)/tv-splash.png))
-	export APP_TV_SPLASH := $(TOPDIR)/tv-splash.png
-else ifneq (,$(wildcard $(TOPDIR)/splash.png))
-	export APP_TV_SPLASH := $(TOPDIR)/splash.png
-endif
-
-ifneq (,$(strip $(DRC_SPLASH)))
-	export APP_DRC_SPLASH := $(TOPDIR)/$(DRC_SPLASH)
-else ifneq (,$(wildcard $(TOPDIR)/drc-splash.png))
-	export APP_DRC_SPLASH := $(TOPDIR)/drc-splash.png
-else ifneq (,$(wildcard $(TOPDIR)/splash.png))
-	export APP_DRC_SPLASH := $(TOPDIR)/splash.png
-endif
-
-.PHONY: $(BUILD) clean all
-
-#-------------------------------------------------------------------------------
-all: $(BUILD)
-
-$(BUILD):
-	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-
-#-------------------------------------------------------------------------------
+# Clean up
 clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(OUTPUT).wuhb $(TARGET).rpx $(OUTPUT).elf
+	rm -f $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(MAIN_OBJ) $(EXEC)
 
-#-------------------------------------------------------------------------------
-else
-.PHONY:	all
+# Phony targets
+.PHONY: all clean
 
-DEPENDS	:=	$(OFILES:.o=.d)
-
-#-------------------------------------------------------------------------------
-# main targets
-#-------------------------------------------------------------------------------
-all	:	$(OUTPUT).wuhb
-
-$(OUTPUT).wuhb	:	$(OUTPUT).rpx
-$(OUTPUT).rpx	:	$(OUTPUT).elf
-$(OUTPUT).elf	:	$(OFILES)
-
-$(OFILES_SRC)	: $(HFILES_BIN)
-
-#-------------------------------------------------------------------------------
-# you need a rule like this for each extension you use as binary data
-#-------------------------------------------------------------------------------
-%.bin.o	%_bin.h :	%.bin
-#-------------------------------------------------------------------------------
-	@echo $(notdir $<)
-	@$(bin2o)
-
--include $(DEPENDS)
-
-#-------------------------------------------------------------------------------
-endif
-#-------------------------------------------------------------------------------

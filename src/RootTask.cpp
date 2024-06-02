@@ -120,15 +120,26 @@ void RootTask::prepare_()
         // Get window instance
         const rio::Window* const window = rio::Window::instance();
 
-        // Create perspective projection instance
+        // Calculate the aspect ratio based on the window dimensions
         float aspect = f32(window->getWidth()) / f32(window->getHeight());
-        float fovy = rio::Mathf::deg2rad(43.2);
+        // Calculate the field of view (fovy) based on the given parameters
+        float fovy;
+        if (f32(window->getWidth()) < f32(window->getHeight())) {
+            fovy = 2 * atan2f(43.2f / aspect, 500.0f);
+        } else {
+            fovy = 2 * atan2f(43.2f, 500.0f);
+        }
+        // C_MTXPerspective(Mtx44 m, f32 fovy, f32 aspect, f32 near, f32 far)
+        // PerspectiveProjection(f32 near, f32 far, f32 fovy, f32 aspect)
+        // RFLiMakeIcon: C_MTXPerspective(projMtx, fovy, aspect, 500.0f, 700.0f)
+        // Create perspective projection instance
         rio::PerspectiveProjection proj(
-            0.1f, // near
-            10000.0f, // far
-            fovy,
-            aspect // aspect
+            500.0f, // Near
+            700.0f, // Far
+            fovy, // fovy
+            aspect // Aspect ratio
         );
+        // The near and far values define the depth range of the view frustum (500.0f to 700.0f)
 
         // Calculate matrix
         mProjMtx = proj.getMatrix();
@@ -222,7 +233,7 @@ void RootTask::createModel_() {
         delete mpModel;
         mpModel = nullptr;
     } else {
-        mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
+        mpModel->setScale({ 1.f, 1.f, 1.f });
     }
     mCounter = 0.0f;
 }
@@ -284,7 +295,7 @@ void RootTask::createModel_(char (*buf)[FFLICHARINFO_SIZE]) {
         delete mpModel;
         mpModel = nullptr;
     } else {
-        mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
+        mpModel->setScale({ 1.f, 1.f, 1.f });
     }
 
     // Reset counter or maintain its state based on the application logic
@@ -348,21 +359,31 @@ void RootTask::calc_()
     }
     #endif
 
-    static const rio::Vector3f CENTER_POS = { 0.0f, 2.0f, -0.25f };
+    // Distance in the XZ-plane from the center to the camera position
+    static const float radius = 600.0f;
+    // Define a constant position in the 3D space for the center position of the camera
+    static const rio::Vector3f CENTER_POS = { 0.0f, 34.5f, radius };
 
-    mCamera.at() = CENTER_POS;
+    // Define the target position that the camera will look at (center of the scene)
+    static const rio::Vector3f target = { 0.0f, 34.5f, 0.0f };
+    mCamera.at() = target;
 
-    // Move camera
+    // Define the up vector for the camera to maintain the correct orientation (Y-axis is up)
+    static const rio::Vector3f cameraUp = { 0.0f, 1.0f, 0.0f };
+    mCamera.setUp(cameraUp);
+
+    // Move the camera around the target
+    // Define the radius of the orbit in the XZ-plane (distance from the target)
     mCamera.pos().set(
-        // 10 = how close it is??
-        CENTER_POS.x + std::sin(mCounter) * 10,
+        // Set the camera's position using the sin and cos functions to move it in a circle around the target
+        std::sin(mCounter) * radius,
         CENTER_POS.y,
-        CENTER_POS.z + std::cos(mCounter) * 10
+        std::cos(mCounter) * radius
     );
-    // if you reduce 60 it'll speed this up (not framerate)
+    // Increment the counter to gradually change the camera's position over time
     mCounter += 1.f / 60;
 
-    // Get view matrix
+    // Get the view matrix from the camera, which represents the camera's orientation and position in the world
     rio::BaseMtx34f view_mtx;
     mCamera.getMatrix(&view_mtx);
 

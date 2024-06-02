@@ -122,13 +122,18 @@ void RootTask::prepare_()
 
         // Create perspective projection instance
         float aspect = f32(window->getWidth()) / f32(window->getHeight());
-        float fovy = rio::Mathf::deg2rad(43.2);
+        /*float fovy = rio::Mathf::deg2rad(43.2);
         rio::PerspectiveProjection proj(
             0.1f, // near
             10000.0f, // far
             fovy,
             aspect // aspect
-        );
+        );*/
+        float fovy = 2 * ((180 / 3.141592653589793f) * atan2f(43.2f, 500.0f));
+        // C_MTXPerspective(Mtx44 m, f32 fovy, f32 aspect, f32 near, f32 far)
+        // PerspectiveProjection(f32 near, f32 far, f32 fovy, f32 aspect)
+        // original: C_MTXPerspective(projMtx, fovy, aspect, 500.0f, 700.0f)
+        rio::PerspectiveProjection proj(500.0f, 700.0f, fovy, aspect);
 
         // Calculate matrix
         mProjMtx = proj.getMatrix();
@@ -348,7 +353,7 @@ void RootTask::calc_()
     }
     #endif
 
-    static const rio::Vector3f CENTER_POS = { 0.0f, 2.0f, -0.25f };
+/*    static const rio::Vector3f CENTER_POS = { 0.0f, 2.0f, -0.25f };
 
     mCamera.at() = CENTER_POS;
 
@@ -361,7 +366,14 @@ void RootTask::calc_()
     );
     // if you reduce 60 it'll speed this up (not framerate)
     mCounter += 1.f / 60;
-
+*/
+    const rio::Vector3f cameraPos = {0.0f, 34.5f, 600.0f};
+    const rio::Vector3f target = {0.0f, 34.5f, 0.0f};
+    const rio::Vector3f cameraUp = {0.0f, 1.0f, 0.0f};
+    // C_MTXLookAt(Mtx m, const Vec* camPos, const Vec* camUp, const Vec* target)
+    // LookAtCamera(const Vector3f& pos, const Vector3f& at, const Vector3f& up)
+    // original: C_MTXLookAt(viewMtx, &cameraPos, &cameraUp, &target);
+    rio::LookAtCamera mCamera(cameraPos, target, cameraUp);
     // Get view matrix
     rio::BaseMtx34f view_mtx;
     mCamera.getMatrix(&view_mtx);

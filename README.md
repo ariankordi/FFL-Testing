@@ -25,11 +25,10 @@ As of 2024-05-31, I added a Makefile that should more or less "just" work on Lin
     ```
     To build with WUT, use: `make wut -j4`
 3. Obtain required files.
-    * You'll need to extract the following folder from a Wii U MLC:
-        - `sys/title/0005001b/10056000/content`
-    * Copy that folder, and make the folder structure above, then place sys in the root of the repo.
-        - Sorry if this part is a little unclear. From the root of the repo directory, you need to make sure that `sys/title/0005001b/10056000/content/FFLResHigh.dat` is accessible.
-    * This contains the `FFLResHigh.dat` and `FFLResMiddle.dat` resources that this needs to run.
+    * You'll need to extract the following file from a Wii U:
+        - `sys/title/0005001b/10056000/content/FFLResHigh.dat`
+    * Place that file in the root of this repo.
+        - This file contains models and textures needed to render Miis and this program will not work without it.
 4. Run `ffl_testing_2_debug64`, and pray that it works.
 
 ### Compiling dependencies GLEW and GLFW3

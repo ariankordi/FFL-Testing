@@ -49,3 +49,4 @@ ffl_testing_2_debug*
 # mlc
 sys/
 usr/
+FFLRes*.dat

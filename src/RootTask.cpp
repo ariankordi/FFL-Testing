@@ -8,6 +8,7 @@
 #include <gpu/rio_RenderState.h>
 
 #include <string>
+#include <array>
 
 RootTask::RootTask()
     : ITask("FFL Testing")
@@ -54,8 +55,8 @@ void RootTask::prepare_()
     {
         std::string resPath;
         resPath.resize(256);
-        // Middle
-        {
+        // Middle (now being skipped bc it is not even used here)
+        /*{
             FFLGetResourcePath(resPath.data(), 256, FFL_RESOURCE_TYPE_MIDDLE, false);
             {
                 rio::FileDevice::LoadArg arg;
@@ -66,32 +67,46 @@ void RootTask::prepare_()
                 if (buffer == nullptr)
                 {
                     RIO_LOG("NativeFileDevice failed to load: %s\n", resPath.c_str());
-                    RIO_ASSERT(false);
-                    return;
+                    RIO_LOG("Skipping loading FFL_RESOURCE_TYPE_MIDDLE\n");
+                    // I added a line that skips the resource if the size is zero
+                    mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] = 0;
+                } else {
+                    mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE] = buffer;
+                    mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] = arg.read_size;
                 }
-
-                mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE] = buffer;
-                mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] = arg.read_size;
             }
-        }
-        // High
+        }*/
+        mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] = 0;
+        // High, load from FFL path or current working directory
         {
-            FFLGetResourcePath(resPath.data(), 256, FFL_RESOURCE_TYPE_HIGH, false);
-            {
+            // Two different paths
+            std::array<std::string, 2> resPaths = {"", "./FFLResHigh.dat"};
+            resPaths[0].resize(256);
+            FFLGetResourcePath(resPaths[0].data(), 256, FFL_RESOURCE_TYPE_HIGH, false);
+
+            bool resLoaded = false;
+
+            // Try two different paths
+            for (const auto& resPath : resPaths) {
                 rio::FileDevice::LoadArg arg;
                 arg.path = resPath;
                 arg.alignment = 0x2000;
 
                 u8* buffer = rio::FileDeviceMgr::instance()->getNativeFileDevice()->tryLoad(arg);
-                if (buffer == nullptr)
-                {
-                    RIO_LOG("NativeFileDevice failed to load: %s\n", resPath.c_str());
-                    RIO_ASSERT(false);
-                    return;
+                if (buffer != nullptr) {
+                    mResourceDesc.pData[FFL_RESOURCE_TYPE_HIGH] = buffer;
+                    mResourceDesc.size[FFL_RESOURCE_TYPE_HIGH] = arg.read_size;
+                    resLoaded = true;
+                    // Break when one loads successfully
+                    break;
+                } else {
+                    RIO_LOG("NativeFileDevice failed to load: %s\n", arg.path.c_str());
                 }
+            }
 
-                mResourceDesc.pData[FFL_RESOURCE_TYPE_HIGH] = buffer;
-                mResourceDesc.size[FFL_RESOURCE_TYPE_HIGH] = arg.read_size;
+            if (!resLoaded) {
+                RIO_LOG("Was not able to load high resource!!!\n");
+                RIO_ASSERT(false);
             }
         }
     }

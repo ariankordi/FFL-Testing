@@ -372,12 +372,13 @@ void RootTask::calc_()
     static const rio::Vector3f cameraUp = { 0.0f, 1.0f, 0.0f };
     mCamera.setUp(cameraUp);
 
-    // Move the camera around the target
+    // Move the camera around the target clockwise
     // Define the radius of the orbit in the XZ-plane (distance from the target)
     mCamera.pos().set(
         // Set the camera's position using the sin and cos functions to move it in a circle around the target
         std::sin(mCounter) * radius,
         CENTER_POS.y,
+        // Add a minus sign to the cosine to spin CCW (same as SpinMii)
         std::cos(mCounter) * radius
     );
     // Increment the counter to gradually change the camera's position over time

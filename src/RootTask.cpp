@@ -28,8 +28,6 @@ RootTask::RootTask()
 #include <fcntl.h>
 #endif
 
-#include <iostream>
-
 #include <nn/ffl/FFLiMiiData.h>
 
 #if RIO_IS_WIN
@@ -37,6 +35,10 @@ int server_fd, new_socket;
 struct sockaddr_in address;
 int opt = 1;
 int addrlen = sizeof(address);
+
+// for opening ffsd folder
+#include <filesystem>
+#include <fstream>
 #endif
 
 void RootTask::prepare_()
@@ -127,9 +129,6 @@ void RootTask::prepare_()
 
     mShader.initialize();
 
-    mMiiCounter = 0;
-    createModel_();
-
     // Set projection matrix
     {
         // Get window instance
@@ -161,77 +160,132 @@ void RootTask::prepare_()
     }
 
 
+    // read Mii data from a folder
     #if RIO_IS_WIN
-    #ifdef _WIN32
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
-        perror("WSAStartup failed");
-        exit(EXIT_FAILURE);
+    // Path to the folder
+    const std::string folderPath = "place_ffsd_files_here";
+    // Check if the folder exists
+    if (std::filesystem::exists(folderPath) && std::filesystem::is_directory(folderPath)) {
+        for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
+            if (entry.is_regular_file() && entry.file_size() == sizeof(FFLStoreData)) {
+                // Read the file content
+                std::ifstream file(entry.path(), std::ios::binary);
+                if (file.is_open()) {
+                    FFLStoreData data;
+                    file.read(reinterpret_cast<char*>(&data), sizeof(FFLStoreData));
+                    if (file.gcount() == sizeof(FFLStoreData)) {
+                        mStoreDataArray.push_back(data);
+                    }
+                    file.close();
+                }
+            }
+        }
+        RIO_LOG("Loaded %d FFSD files into mStoreDataArray\n", mStoreDataArray.size());
     }
-    #endif // ifdef _WIN32
+    #endif // RIO_IS_WIN (folder)
 
-    // Creating socket file descriptor
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
+    mMiiCounter = 0;
+    createModel_();
+
+    // Setup socket to send data to
+    #if RIO_IS_WIN
+    {
+        #ifdef _WIN32
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
+            perror("WSAStartup failed");
+            exit(EXIT_FAILURE);
+        }
+        #endif // ifdef _WIN32
+
+        // Creating socket file descriptor
+        if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+            perror("socket failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Forcefully attaching socket to the port 8080
+        if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&opt), sizeof(opt))) {
+            perror("setsockopt");
+            exit(EXIT_FAILURE);
+        }
+
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = INADDR_ANY;
+        // Get port number from environment or use default 8080
+        const char* env_port = getenv("PORT");
+        int port = env_port ? atoi(env_port) : 8080;
+        // Forcefully attaching socket to the port
+        address.sin_port = htons(port);
+        if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+            perror("bind failed");
+            RIO_LOG("\033[1m" \
+            "TIP: Change the default port of 8080 with the PORT environment variable" \
+            "\033[0m\n");
+            exit(EXIT_FAILURE);
+        }
+        if (listen(server_fd, 3) < 0) {
+            perror("listen");
+            exit(EXIT_FAILURE);
+        } else {
+            // Set socket to non-blocking mode
+            #ifdef _WIN32
+            u_long mode = 1;
+            ioctlsocket(server_fd, FIONBIO, &mode);
+            #else
+            fcntl(server_fd, F_SETFL, O_NONBLOCK);
+            #endif
+
+            mSocketIsListening = true;
+
+            RIO_LOG("\033[1m" \
+            "tcp server listening on port %d\033[0m\n" \
+            "\033[2m(you can change the port with the PORT environment variable)\033[0m\n" \
+            "try sending FFLStoreData or FFLiCharInfo (little endian) to it with netcat\n", 
+            port);
+        }
     }
 
-    // Forcefully attaching socket to the port 8080
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&opt), sizeof(opt))) {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
-    }
-
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    // Get port number from environment or use default 8080
-    const char* env_port = getenv("PORT");
-    int port = env_port ? atoi(env_port) : 8080;
-    // Forcefully attaching socket to the port
-    address.sin_port = htons(port);
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-        perror("bind failed");
-        std::cout << "\033[1m" <<
-        "TIP: change the default port of 8080 with the PORT environment variable"
-        << "\033[0m\n";
-        exit(EXIT_FAILURE);
-    }
-    if (listen(server_fd, 3) < 0) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-
-    // Set socket to non-blocking mode
-    #ifdef _WIN32
-    u_long mode = 1;
-    ioctlsocket(server_fd, FIONBIO, &mode);
-    #else
-    fcntl(server_fd, F_SETFL, O_NONBLOCK);
-    #endif
-
-    //mSocketIsListening = true;
-
-    std::cout << "\033[1m" <<
-    "tcp server listening on port " << std::to_string(port) << "\033[0m" << std::endl
-    << "\033[2m(you can change the port with the PORT environment variable)\033[0m\n"
-    << "try sending FFLStoreData or FFLiCharInfo (little endian) to it with netcat"
-    << std::endl;
-
-    #endif // RIO_IS_WIN
+    #endif // RIO_IS_WIN (socket)
 
     mInitialized = true;
 }
+
+// amount of mii indexes to cycle through
+// default source only has 6
+// GetMiiDataNum()
+int maxMiis = 6;
 
 void RootTask::createModel_() {
     FFLCharModelSource modelSource;
 
     // default model source if there is no socket
-    modelSource.dataSource = FFL_DATA_SOURCE_DEFAULT;
-    modelSource.index = mMiiCounter;
-    modelSource.pBuffer = NULL;
+    #if RIO_IS_CAFE
+        // use mii maker database on wii u
+        modelSource.dataSource = FFL_DATA_SOURCE_OFFICIAL;
+        // NOTE: will only use first 6 miis from mii maker database
+    #else
+    if (!mStoreDataArray.empty()) {
+        // Use the custom Mii data array
+        modelSource.index = 0;
+        modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
+        modelSource.pBuffer = &mStoreDataArray[mMiiCounter];
+        // limit current counter by the amount of custom miis
+        maxMiis = mStoreDataArray.size();
+    } else {
+        // default mii source, otherwise known as guest miis
+        modelSource.dataSource = FFL_DATA_SOURCE_DEFAULT;
+        // guest miis are defined in FFLiDatabaseDefault.cpp
+        // fetched from m_MiiDataOfficial, derived from the static array MII_DATA_CORE_RFL
+        modelSource.index = mMiiCounter;
+        modelSource.pBuffer = NULL;
+    }
+    #endif
 
-    // 6 = count of guest Miis
-    mMiiCounter = (mMiiCounter + 1) % 6;
+    // limit current counter by the amount
+    // of max miis (6 for default/guest miis)
+    mMiiCounter = (mMiiCounter + 1) % maxMiis;
+
 
     Model::InitArgStoreData arg = {
         .desc = {
@@ -280,16 +334,15 @@ void RootTask::createModel_(char (*buf)[FFLICHARINFO_SIZE]) {
     modelSource.index = 0;
     modelSource.pBuffer = pCharInfo; //&storeData;
 
-    std::cout << "\033[1mLoaded Mii: \033[0m";
-
     // Convert UTF-16 to UTF-8
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-    std::cout << convert.to_bytes((char16_t*) pCharInfo->name)
-        << std::endl;
+    // print in bold
+    RIO_LOG("\033[1mLoaded Mii: %s\033[0m\n",
+            convert.to_bytes((char16_t*) pCharInfo->name).c_str());
     // close connection which should happen as soon as we read it
     #if RIO_IS_WIN && defined(_WIN32)
         closesocket(new_socket);
-    #elif defined(_WIN32)
+    #elif RIO_IS_WIN
         close(new_socket);
     #endif
     // otherwise just fall through and use default
@@ -343,7 +396,8 @@ void RootTask::calc_()
     char buf[sizeof(FFLiCharInfo)];
 
     #if RIO_IS_WIN
-    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) > 0) {
+    if (mSocketIsListening &&
+        (new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) > 0) {
         // Assuming data directly received is FFLStoreData
         ssize_t read_bytes =
             //read(new_socket, &storeData, sizeof(FFLStoreData));
@@ -403,7 +457,7 @@ void RootTask::calc_()
     rio::BaseMtx34f view_mtx;
     mCamera.getMatrix(&view_mtx);
 
-  //mpModel->enableSpecialDraw();
+    //mpModel->enableSpecialDraw();
 
     if (mpModel != nullptr) {
         mpModel->drawOpa(view_mtx, mProjMtx);

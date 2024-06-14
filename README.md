@@ -30,6 +30,31 @@ As of 2024-05-31, I added a Makefile that should more or less "just" work on Lin
     * Place that file in the root of this repo.
         - This file contains models and textures needed to render Miis and this program will not work without it.
 4. Run `ffl_testing_2_debug64`, and pray that it works.
+    * If it crashes with a segfault or shows you a blank screen, make sure you have `FFLResHigh.dat` and it can open it.
+
+### Using your own Miis
+As of 2024-06-14, I added a change that would let you change which Miis this program renders, by reading files in the `place_ffsd_files_here` folder.
+
+As the name implies, you should be able to take any Mii in a 96 byte FFSD/FFLStoreData file, and place it in that folder.
+
+* Only the length of the file is checked, not the extension or name. It needs to be 96 bytes.
+
+* Then, it will just read each file sequentially, looping through all of them.
+* You can also just put one file there and that one Mii will spin continuously.
+
+#### If you don't have any FFSD files...
+* You can search for any *.ffsd or *.cfsd (CFLStoreData = FFLStoreData) file in this repo:
+    - https://github.com/HEYimHeroic/MiiDataFiles
+
+* Grab the Mii from your Nintendo Network ID using the mii-unsecure.ariankordi.net API, if it is still up by the time you are reading this.
+    - `curl --verbose --header "Accept: application/octet-stream" https://mii-unsecure.ariankordi.net/mii_data/JasmineChlora --output JasmineChlora.ffsd`
+        * Replace `JasmineChlora` with your own NNID, of course.
+* You can also use the pf2m.com API if your Mii is archived there: `curl --verbose https://pf2m.com/mii/InklingsAreHot | jq -r .data | base64 -d > InklingsAreHot.ffsd`
+    - Also check the response by hand, very likely it is not cached.
+* I believe this script decrypts Mii QR Code data directly to FFSD/CFSD format: https://gist.github.com/jaames/96ce8daa11b61b758b6b0227b55f9f78
+    - I use it with ZBar like so: `zbarimg --quiet --raw --oneshot -Sbinary image.jpg | python3 mii-qr.py /dev/stdin ./mii.ffsd`
+        * Replace: `image.jpg`, `mii.ffsd`
+    - I also made a scanner in JS, though it gives you Base64 that you have to decode: https://jsfiddle.net/arian_/h31tdg7r/1/
 
 ### Compiling dependencies GLEW and GLFW3
 <details>

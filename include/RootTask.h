@@ -7,6 +7,10 @@
 
 #define FFLICHARINFO_SIZE sizeof(FFLiCharInfo)
 
+#if RIO_IS_WIN
+#include <vector>
+#endif
+
 class Model;
 
 class RootTask : public rio::ITask
@@ -24,7 +28,10 @@ private:
 
 private:
     bool                mInitialized;
-    //bool                mSocketIsListening;
+    bool                mSocketIsListening;
+    #if RIO_IS_WIN
+    std::vector<FFLStoreData> mStoreDataArray;
+    #endif
     FFLResourceDesc     mResourceDesc;
     Shader              mShader;
     rio::BaseMtx44f     mProjMtx;

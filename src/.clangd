@@ -1,0 +1,14 @@
+# clangd's LSP is in kate so this is so that
+# it won't give me excessive red underlines
+CompileFlags:
+  Add:
+    # didn't work without the ../ for some reason
+    - "-I../rio/include"
+    # set build target
+    - "-DRIO_IS_WIN"
+    - "-DRIO_DEBUG"
+    # static asserts will be ignored
+    - "-DNDEBUG"
+    - "-I../ffl/include"
+    - "-I../include"
+    - "-Iinclude"

@@ -51,8 +51,7 @@ $(info $(LDFLAGS))
 
 # macOS (doesn't support cross compiling tho)
 ifeq ($(shell uname), Darwin)
-    INCLUDES += -I/opt/homebrew/include
-    LDFLAGS += -L/opt/homebrew/lib -framework OpenGL -framework Foundation -framework CoreGraphics -framework AppKit -framework IOKit
+    LDFLAGS += -framework OpenGL -framework Foundation -framework CoreGraphics -framework AppKit -framework IOKit
     EXEC := ffl_testing_2_debug_apple64
     # clip control is for opengl 4.5 and later and macos only supports 4.1
     DEFS += -DRIO_NO_CLIP_CONTROL
@@ -82,8 +81,10 @@ CXXFLAGS := -g -std=c++17 $(CXXFLAGS) $(INCLUDES) $(PKG_CONFIG_CFLAGS_OUTPUT) $(
 NINTEXUTILS_SRC := $(shell find ninTexUtils/src/ninTexUtils -name '*.c' -o -name '*.cpp')
 RIO_SRC := $(shell find rio/src -name '*.c' -o -name '*.cpp')
 FFL_SRC := $(shell find ffl/src -name '*.c' -o -name '*.cpp')
+
+SHADER ?= src/Shader.cpp
 # Main source
-SRC := $(wildcard ./**/*.cpp)
+SRC := src/main.cpp src/Model.cpp src/RootTask.cpp $(SHADER)
 
 # Object files
 NINTEXUTILS_OBJ := $(NINTEXUTILS_SRC:.c=.o)
@@ -114,11 +115,11 @@ $(EXEC): $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ)
 
 # Clean up
 clean:
-	rm -f $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ) $(EXEC)
+	rm -f $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ) $(EXEC) src/Shader*.o build/*.o build/*.d build/*.map
 
 # Phony targets
 .PHONY: all clean
 
 # Mode for chainloading Makefile.wut
 wut:
-	$(MAKE) -f Makefile.wut
+	$(MAKE) -f Makefile.wut SRC="$(SRC)" INCLUDES="$(foreach include,$(INCLUDES),$(patsubst -I%,%,$(include)))"

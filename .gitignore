@@ -50,3 +50,9 @@ ffl_testing_2_debug*
 sys/
 usr/
 FFLRes*.dat
+
+# renderdoc captures
+*.cap
+# misc
+*swp
+.DS_Store

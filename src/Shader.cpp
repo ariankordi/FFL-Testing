@@ -157,8 +157,16 @@ void Shader::initialize()
     GX2InitFetchShaderEx(&mFetchShader, (u8*)buffer, FFL_ATTRIBUTE_BUFFER_TYPE_MAX, mAttribute, GX2_FETCH_SHADER_TESSELLATION_NONE, GX2_TESSELLATION_MODE_DISCRETE);
 #elif RIO_IS_WIN
     RIO_ASSERT(mVAOHandle == GL_NONE);
-    RIO_GL_CALL(glCreateBuffers(FFL_ATTRIBUTE_BUFFER_TYPE_MAX, mVBOHandle));
-    RIO_GL_CALL(glCreateVertexArrays(1, &mVAOHandle));
+
+    // OpenGL <4.5 compatible buffer creation
+    GLuint buffers[FFL_ATTRIBUTE_BUFFER_TYPE_MAX];
+    RIO_GL_CALL(glGenBuffers(FFL_ATTRIBUTE_BUFFER_TYPE_MAX, buffers));
+    for (int i = 0; i < FFL_ATTRIBUTE_BUFFER_TYPE_MAX; ++i) {
+        mVBOHandle[i] = buffers[i];
+    }
+
+    // Generate Vertex Array Object (VAO)
+    RIO_GL_CALL(glGenVertexArrays(1, &mVAOHandle));
     RIO_ASSERT(mVAOHandle != GL_NONE);
 #endif
 
@@ -234,10 +242,13 @@ void Shader::applyAlphaTestCallback_(void* p_obj, bool enable, rio::Graphics::Co
 
 void Shader::draw_(const FFLDrawParam& draw_param)
 {
+    // Set the culling mode
     setCulling(draw_param.cullMode);
 
+    // Set the modulation mode uniform
     mShader.setUniform(s32(draw_param.modulateParam.mode), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MODE]);
 
+    // Handle different modulation modes
     switch (draw_param.modulateParam.mode)
     {
     case FFL_MODULATE_MODE_0:
@@ -255,228 +266,97 @@ void Shader::draw_(const FFLDrawParam& draw_param)
         break;
     }
 
+    // Bind texture if available
     if (draw_param.modulateParam.pTexture2D != nullptr)
     {
         mSampler.linkTexture2D(draw_param.modulateParam.pTexture2D);
         mSampler.tryBindFS(mSamplerLocation, 0);
     }
 
+    // Bind attribute buffers and draw elements if index buffer is available
     if (draw_param.primitiveParam.pIndexBuffer != nullptr)
     {
 #if RIO_IS_CAFE
-        GX2SetAttribBuffer(
-            FFL_ATTRIBUTE_BUFFER_TYPE_POSITION,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_POSITION].size,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_POSITION].stride,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_POSITION].ptr
-        );
-        GX2SetAttribBuffer(
-            FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD].size,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD].stride,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD].ptr
-        );
-        GX2SetAttribBuffer(
-            FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL].size,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL].stride,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL].ptr
-        );
-        GX2SetAttribBuffer(
-            FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT].size,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT].stride,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT].ptr
-        );
-        GX2SetAttribBuffer(
-            FFL_ATTRIBUTE_BUFFER_TYPE_COLOR,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_COLOR].size,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_COLOR].stride,
-            draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_COLOR].ptr
-        );
+        for (int type = FFL_ATTRIBUTE_BUFFER_TYPE_POSITION; type <= FFL_ATTRIBUTE_BUFFER_TYPE_COLOR; ++type)
+        {
+            GX2SetAttribBuffer(
+                type,
+                draw_param.attributeBufferParam.attributeBuffers[type].size,
+                draw_param.attributeBufferParam.attributeBuffers[type].stride,
+                draw_param.attributeBufferParam.attributeBuffers[type].ptr
+            );
+        }
 #elif RIO_IS_WIN
+        for (int type = FFL_ATTRIBUTE_BUFFER_TYPE_POSITION; type <= FFL_ATTRIBUTE_BUFFER_TYPE_COLOR; ++type)
         {
-            FFLAttributeBufferType type = FFL_ATTRIBUTE_BUFFER_TYPE_POSITION;
-
             const FFLAttributeBuffer& buffer = draw_param.attributeBufferParam.attributeBuffers[type];
             s32 location = mAttributeLocation[type];
-
             void* ptr = buffer.ptr;
 
             if (ptr && location != -1)
             {
                 u32 stride = buffer.stride;
+                u32 vbo_handle = mVBOHandle[type];
+                u32 size = buffer.size;
 
                 if (stride == 0)
                 {
-                    RIO_GL_CALL(glVertexAttrib3fv(location, static_cast<f32*>(ptr)));
+                    // Directly set vertex attribute without buffer
+                    switch (type)
+                    {
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_POSITION:
+                        RIO_GL_CALL(glVertexAttrib3fv(location, static_cast<f32*>(ptr)));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD:
+                        RIO_GL_CALL(glVertexAttrib2fv(location, static_cast<f32*>(ptr)));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL:
+                        RIO_GL_CALL(glVertexAttribP4ui(location, GL_INT_2_10_10_10_REV, true, *static_cast<u32*>(ptr)));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT:
+                        RIO_GL_CALL(glVertexAttrib4Nbv(location, static_cast<s8*>(ptr)));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_COLOR:
+                        RIO_GL_CALL(glVertexAttrib4Nubv(location, static_cast<u8*>(ptr)));
+                        break;
+                    default:
+                        break;
+                    }
                 }
                 else
                 {
-                    u32 vbo_handle = mVBOHandle[type];
-                    u32 size = buffer.size;
-
+                    // Bind buffer and set vertex attribute pointer
                     RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo_handle));
                     RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
-
                     RIO_GL_CALL(glEnableVertexAttribArray(location));
-                    RIO_GL_CALL(glVertexAttribPointer(
-                        location,
-                        3,
-                        GL_FLOAT,
-                        false,
-                        stride,
-                        nullptr
-                    ));
-                }
-            }
-        }
-        {
-            FFLAttributeBufferType type = FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD;
 
-            const FFLAttributeBuffer& buffer = draw_param.attributeBufferParam.attributeBuffers[type];
-            s32 location = mAttributeLocation[type];
-
-            void* ptr = buffer.ptr;
-
-            if (ptr && location != -1)
-            {
-                u32 stride = buffer.stride;
-
-                if (stride == 0)
-                {
-                    RIO_GL_CALL(glVertexAttrib2fv(location, static_cast<f32*>(ptr)));
-                }
-                else
-                {
-                    u32 vbo_handle = mVBOHandle[type];
-                    u32 size = buffer.size;
-
-                    RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo_handle));
-                    RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
-
-                    RIO_GL_CALL(glEnableVertexAttribArray(location));
-                    RIO_GL_CALL(glVertexAttribPointer(
-                        location,
-                        2,
-                        GL_FLOAT,
-                        false,
-                        stride,
-                        nullptr
-                    ));
-                }
-            }
-        }
-        {
-            FFLAttributeBufferType type = FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL;
-
-            const FFLAttributeBuffer& buffer = draw_param.attributeBufferParam.attributeBuffers[type];
-            s32 location = mAttributeLocation[type];
-
-            void* ptr = buffer.ptr;
-
-            if (ptr && location != -1)
-            {
-                u32 stride = buffer.stride;
-
-                if (stride == 0)
-                {
-                    RIO_GL_CALL(glVertexAttribP4ui(location, GL_INT_2_10_10_10_REV, true, *static_cast<u32*>(ptr)));
-                }
-                else
-                {
-                    u32 vbo_handle = mVBOHandle[type];
-                    u32 size = buffer.size;
-
-                    RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo_handle));
-                    RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
-
-                    RIO_GL_CALL(glEnableVertexAttribArray(location));
-                    RIO_GL_CALL(glVertexAttribPointer(
-                        location,
-                        4,
-                        GL_INT_2_10_10_10_REV,
-                        true,
-                        stride,
-                        nullptr
-                    ));
-                }
-            }
-        }
-        {
-            FFLAttributeBufferType type = FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT;
-
-            const FFLAttributeBuffer& buffer = draw_param.attributeBufferParam.attributeBuffers[type];
-            s32 location = mAttributeLocation[type];
-
-            void* ptr = buffer.ptr;
-
-            if (ptr && location != -1)
-            {
-                u32 stride = buffer.stride;
-
-                if (stride == 0)
-                {
-                    RIO_GL_CALL(glVertexAttrib4Nbv(location, static_cast<s8*>(ptr)));
-                }
-                else
-                {
-                    u32 vbo_handle = mVBOHandle[type];
-                    u32 size = buffer.size;
-
-                    RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo_handle));
-                    RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
-
-                    RIO_GL_CALL(glEnableVertexAttribArray(location));
-                    RIO_GL_CALL(glVertexAttribPointer(
-                        location,
-                        4,
-                        GL_BYTE,
-                        true,
-                        stride,
-                        nullptr
-                    ));
-                }
-            }
-        }
-        {
-            FFLAttributeBufferType type = FFL_ATTRIBUTE_BUFFER_TYPE_COLOR;
-
-            const FFLAttributeBuffer& buffer = draw_param.attributeBufferParam.attributeBuffers[type];
-            s32 location = mAttributeLocation[type];
-
-            void* ptr = buffer.ptr;
-
-            if (ptr && location != -1)
-            {
-                u32 stride = buffer.stride;
-
-                if (stride == 0)
-                {
-                    RIO_GL_CALL(glVertexAttrib4Nubv(location, static_cast<u8*>(ptr)));
-                }
-                else
-                {
-                    u32 vbo_handle = mVBOHandle[type];
-                    u32 size = buffer.size;
-
-                    RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo_handle));
-                    RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
-
-                    RIO_GL_CALL(glEnableVertexAttribArray(location));
-                    RIO_GL_CALL(glVertexAttribPointer(
-                        location,
-                        4,
-                        GL_UNSIGNED_BYTE,
-                        true,
-                        stride,
-                        nullptr
-                    ));
+                    // Determine attribute pointer parameters based on buffer type
+                    switch (type)
+                    {
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_POSITION:
+                        RIO_GL_CALL(glVertexAttribPointer(location, 3, GL_FLOAT, false, stride, nullptr));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD:
+                        RIO_GL_CALL(glVertexAttribPointer(location, 2, GL_FLOAT, false, stride, nullptr));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL:
+                        RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_INT_2_10_10_10_REV, true, stride, nullptr));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT:
+                        RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_BYTE, true, stride, nullptr));
+                        break;
+                    case FFL_ATTRIBUTE_BUFFER_TYPE_COLOR:
+                        RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_UNSIGNED_BYTE, true, stride, nullptr));
+                        break;
+                    default:
+                        break;
+                    }
                 }
             }
         }
 #endif
 
+        // Draw elements
         rio::Drawer::DrawElements(
             draw_param.primitiveParam.primitiveType,
             draw_param.primitiveParam.indexCount,
@@ -484,6 +364,7 @@ void Shader::draw_(const FFLDrawParam& draw_param)
         );
     }
 }
+
 
 void Shader::drawCallback_(void* p_obj, const FFLDrawParam& draw_param)
 {

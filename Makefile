@@ -100,7 +100,13 @@ all: $(EXEC)
 # TODO: add git submodule update --init --recursive, maybe?
 # TODO: or a reminder if you did not init the submodules and the folders don't have content?
 
-# TODO: add no_clip_control target here
+# no_clip_control target
+no_clip_control: CXXFLAGS += -DRIO_NO_CLIP_CONTROL
+no_clip_control: EXEC := $(EXEC)_no_clip_control
+no_clip_control: $(EXEC)_no_clip_control
+# clone of exec target bc idk how else to do this
+$(EXEC)_no_clip_control: $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ)
+	$(CXX) $^ -o $@ $(CXXFLAGS) $(LDFLAGS)
 
 # Linking the executable
 $(EXEC): $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ)
@@ -118,7 +124,7 @@ clean:
 	rm -f $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ) $(EXEC) src/Shader*.o build/*.o build/*.d build/*.map
 
 # Phony targets
-.PHONY: all clean
+.PHONY: all clean no_clip_control
 
 # Mode for chainloading Makefile.wut
 wut:

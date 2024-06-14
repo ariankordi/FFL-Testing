@@ -337,6 +337,34 @@ void Shader::draw_(const FFLDrawParam& draw_param)
                         RIO_GL_CALL(glVertexAttribPointer(location, 3, GL_FLOAT, false, stride, nullptr));
                         break;
                     case FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD:
+                        #ifdef RIO_NO_CLIP_CONTROL
+                        // accomodate OpenGL default clip plane by flipping texCoords
+                        // NOTE: results in flipping face texture, RATHER THAN...
+                        // ... leaving it upside down, and flipping it SOMEWHERE else (not in shader or here...???)
+                        // NOTE: CAN ALSO PROBABLY BE ADDED TO FFL ITSELF, I just don't know where to put it
+                        if (draw_param.modulateParam.type == FFL_MODULATE_TYPE_SHAPE_MASK ||
+                            draw_param.modulateParam.type == FFL_MODULATE_TYPE_FACE_MAKE ||
+                            draw_param.modulateParam.type == FFL_MODULATE_TYPE_FACE_LINE)
+                        {
+                            // Flip the texture coordinates within the buffer
+                            const u32 numTexCoords = size / sizeof(f32);
+                            f32 flippedTexCoords[numTexCoords];
+                            for (u32 i = 0; i < numTexCoords; i += 2)
+                            {
+                                f32* originalTexCoord = static_cast<f32*>(ptr) + i;
+                                flippedTexCoords[i] = originalTexCoord[0];
+                                // flip Y coordinate
+                                flippedTexCoords[i + 1] = 1.0f - originalTexCoord[1];
+                            }
+                            RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, flippedTexCoords, GL_STATIC_DRAW));
+                        }
+                        else
+                        {
+                            RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
+                        }
+                        #else
+                        RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
+                        #endif
                         RIO_GL_CALL(glVertexAttribPointer(location, 2, GL_FLOAT, false, stride, nullptr));
                         break;
                     case FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL:

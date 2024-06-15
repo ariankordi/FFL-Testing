@@ -4,8 +4,8 @@
 
 static const rio::InitializeArg cInitializeArg = {
     .window = {
-        .width = 600,
-        .height = 600,
+        .width = 800,
+        .height = 800,
 #if RIO_IS_WIN
         .resizable = false
 #endif // RIO_IS_WIN

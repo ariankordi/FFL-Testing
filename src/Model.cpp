@@ -5,6 +5,8 @@
 #include <gpu/rio_RenderState.h>
 #include <math/rio_Matrix.h>
 
+const bool cLightEnable = true;
+
 Model::Model()
     : mCharModelDesc()
     , mMtxRT(rio::Matrix34f::ident)
@@ -73,7 +75,7 @@ void Model::drawXlu(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj
 void Model::setViewUniform_(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx)
 {
     RIO_ASSERT(mpShader);
-    mpShader->bind();
+    mpShader->bind(cLightEnable);
     mpShader->setViewUniform(model_mtx, view_mtx, proj_mtx);
 }
 
@@ -175,7 +177,8 @@ bool Model::initializeCpu_()
 void Model::initializeGpu_(const Shader& shader)
 {
     mpShader = &shader;
-    mpShader->bind();
+    // disable light when rendering faceline textures
+    mpShader->bind(false);
     FFLInitCharModelGPUStep(&mCharModel);
     rio::Window::instance()->makeContextCurrent();
 }

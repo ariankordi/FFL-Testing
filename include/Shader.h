@@ -17,7 +17,7 @@ public:
 
     void initialize();
 
-    void bind() const;
+    void bind(bool light_enable) const;
 
     void setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const;
 
@@ -38,6 +38,13 @@ public:
 private:
     static void applyAlphaTestCallback_(void* p_obj, bool enable, rio::Graphics::CompareFunc func, f32 ref);
 
+    void bindTexture_(const FFLModulateParam& modulateParam);
+    void setConstColor_(u32 ps_loc, const FFLColor& color);
+    void setModulateMode_(FFLModulateMode mode);
+    void setModulate_(const FFLModulateParam& modulateParam);
+
+    void setMaterial_(const FFLDrawParam& drawParam);
+
     void draw_(const FFLDrawParam& draw_param);
     static void drawCallback_(void* p_obj, const FFLDrawParam& draw_param);
 
@@ -47,7 +54,9 @@ private:
 private:
     enum VertexUniform
     {
-        VERTEX_UNIFORM_MVP = 0,
+        VERTEX_UNIFORM_IT = 0,  // Inverse transpose of MV
+        VERTEX_UNIFORM_MV,
+        VERTEX_UNIFORM_PROJ,
         VERTEX_UNIFORM_MAX
     };
 
@@ -56,7 +65,19 @@ private:
         PIXEL_UNIFORM_CONST1 = 0,
         PIXEL_UNIFORM_CONST2,
         PIXEL_UNIFORM_CONST3,
+        PIXEL_UNIFORM_LIGHT_AMBIENT,
+        PIXEL_UNIFORM_LIGHT_DIFFUSE,
+        PIXEL_UNIFORM_LIGHT_DIR,
+        PIXEL_UNIFORM_LIGHT_ENABLE,
+        PIXEL_UNIFORM_LIGHT_SPECULAR,
+        PIXEL_UNIFORM_MATERIAL_AMBIENT,
+        PIXEL_UNIFORM_MATERIAL_DIFFUSE,
+        PIXEL_UNIFORM_MATERIAL_SPECULAR,
+        PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE,
+        PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER,
         PIXEL_UNIFORM_MODE,
+        PIXEL_UNIFORM_RIM_COLOR,
+        PIXEL_UNIFORM_RIM_POWER,
         PIXEL_UNIFORM_MAX
     };
 

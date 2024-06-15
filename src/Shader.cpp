@@ -55,10 +55,161 @@ inline void GX2InitAttribStream(
 #endif // RIO_IS_CAFE
 
 
-const rio::BaseVec3f& getColorUniform(const FFLColor& color)
+const rio::BaseVec4f& getColorUniform(const FFLColor& color)
 {
-    return reinterpret_cast<const rio::BaseVec3f&>(color.r);
+    return reinterpret_cast<const rio::BaseVec4f&>(color.r);
 }
+
+void safeNormalizeVec3(rio::BaseVec3f* vec) {
+    float magnitude = std::sqrt(vec->x * vec->x + vec->y * vec->y + vec->z * vec->z);
+    if (magnitude != 0.0f) {
+        vec->x /= magnitude;
+        vec->y /= magnitude;
+        vec->z /= magnitude;
+    }
+
+    vec->x = std::fmax(std::fmin(vec->x, 1.0f), -1.0f);
+    vec->y = std::fmax(std::fmin(vec->y, 1.0f), -1.0f);
+    vec->z = std::fmax(std::fmin(vec->z, 1.0f), -1.0f);
+
+    if (vec->x == 1.0f || vec->x == -1.0f) {
+        vec->y = 0.0f;
+        vec->z = 0.0f;
+    } else if (vec->y == 1.0f || vec->y == -1.0f) {
+        vec->x = 0.0f;
+        vec->z = 0.0f;
+    } else if (vec->z == 1.0f || vec->z == -1.0f) {
+        vec->x = 0.0f;
+        vec->y = 0.0f;
+    }
+}
+
+void gramSchmidtOrthonormalizeMtx34(rio::BaseMtx34f* mat)
+{
+    rio::BaseVec3f c0, c0Normalized, c1, c1Normalized, c1New, c2New;
+
+    // Extract and normalize the first column
+    c0.x = mat->m[0][0];
+    c0.y = mat->m[1][0];
+    c0.z = mat->m[2][0];
+    c0Normalized = c0;
+    safeNormalizeVec3(&c0Normalized);
+
+    // Extract and normalize the second column
+    c1.x = mat->m[0][1];
+    c1.y = mat->m[1][1];
+    c1.z = mat->m[2][1];
+    c1Normalized = c1;
+    safeNormalizeVec3(&c1Normalized);
+
+    // Compute the third column as the cross product of the first two normalized columns
+    c2New.x = c0Normalized.y * c1Normalized.z - c0Normalized.z * c1Normalized.y;
+    c2New.y = c0Normalized.z * c1Normalized.x - c0Normalized.x * c1Normalized.z;
+    c2New.z = c0Normalized.x * c1Normalized.y - c0Normalized.y * c1Normalized.x;
+
+    // Compute the new second column as the cross product of the third column and the first normalized column
+    c1New.x = c2New.y * c0Normalized.z - c2New.z * c0Normalized.y;
+    c1New.y = c2New.z * c0Normalized.x - c2New.x * c0Normalized.z;
+    c1New.z = c2New.x * c0Normalized.y - c2New.y * c0Normalized.x;
+
+    // Update the matrix with the new orthonormal columns
+    mat->m[0][0] = c0Normalized.x;
+    mat->m[1][0] = c0Normalized.y;
+    mat->m[2][0] = c0Normalized.z;
+
+    mat->m[0][1] = c1New.x;
+    mat->m[1][1] = c1New.y;
+    mat->m[2][1] = c1New.z;
+
+    mat->m[0][2] = c2New.x;
+    mat->m[1][2] = c2New.y;
+    mat->m[2][2] = c2New.z;
+}
+
+struct FFLiDefaultShaderMaterial
+{
+    FFLColor ambient;
+    FFLColor diffuse;
+    FFLColor specular;
+    f32 specularPower;
+    s32 specularMode;
+};
+
+const u32 cMaterialParamSize = 9;
+const FFLiDefaultShaderMaterial cMaterialParam[cMaterialParamSize] = {
+    { // ShapeFaceline
+        { 0.85f, 0.75f, 0.75f, 1.0f }, // ambient
+        { 0.75f, 0.75f, 0.75f, 1.0f }, // diffuse
+        { 0.30f, 0.30f, 0.30f, 1.0f }, // specular
+        1.2f, // specularPower
+        0 // specularMode
+    },
+    { // ShapeBeard
+        { 1.0f, 1.0f, 1.0f, 1.0f }, // ambient
+        { 0.7f, 0.7f, 0.7f, 1.0f }, // diffuse
+        { 0.0f, 0.0f, 0.0f, 1.0f }, // specular
+        40.0f, // specularPower
+        1 // specularMode
+    },
+    { // ShapeNose
+        { 0.90f, 0.85f, 0.85f, 1.0f }, // ambient
+        { 0.75f, 0.75f, 0.75f, 1.0f }, // diffuse
+        { 0.22f, 0.22f, 0.22f, 1.0f }, // specular
+        1.5f, // specularPower
+        0 // specularMode
+    },
+    { // ShapeForehead
+        { 0.85f, 0.75f, 0.75f, 1.0f }, // ambient
+        { 0.75f, 0.75f, 0.75f, 1.0f }, // diffuse
+        { 0.30f, 0.30f, 0.30f, 1.0f }, // specular
+        1.2f, // specularPower
+        0 // specularMode
+    },
+    { // ShapeHair
+        { 1.00f, 1.00f, 1.00f, 1.0f }, // ambient
+        { 0.70f, 0.70f, 0.70f, 1.0f }, // diffuse
+        { 0.35f, 0.35f, 0.35f, 1.0f }, // specular
+        10.0f, // specularPower
+        1 // specularMode
+    },
+    { // ShapeCap
+        { 0.75f, 0.75f, 0.75f, 1.0f }, // ambient
+        { 0.72f, 0.72f, 0.72f, 1.0f }, // diffuse
+        { 0.30f, 0.30f, 0.30f, 1.0f }, // specular
+        1.5f, // specularPower
+        0 // specularMode
+    },
+    { // ShapeMask
+        { 1.0f, 1.0f, 1.0f, 1.0f }, // ambient
+        { 0.7f, 0.7f, 0.7f, 1.0f }, // diffuse
+        { 0.0f, 0.0f, 0.0f, 1.0f }, // specular
+        40.0f, // specularPower
+        1 // specularMode
+    },
+    { // ShapeNoseline
+        { 1.0f, 1.0f, 1.0f, 1.0f }, // ambient
+        { 0.7f, 0.7f, 0.7f, 1.0f }, // diffuse
+        { 0.0f, 0.0f, 0.0f, 1.0f }, // specular
+        40.0f, // specularPower
+        1 // specularMode
+    },
+    { // ShapeGlass
+        { 1.0f, 1.0f, 1.0f, 1.0f }, // ambient
+        { 0.7f, 0.7f, 0.7f, 1.0f }, // diffuse
+        { 0.0f, 0.0f, 0.0f, 1.0f }, // specular
+        40.0f, // specularPower
+        1 // specularMode
+    }
+};
+
+const FFLColor cLightAmbient  = { 0.73f, 0.73f, 0.73f, 1.0f };
+const FFLColor cLightDiffuse  = { 0.60f, 0.60f, 0.60f, 1.0f };
+const FFLColor cLightSpecular = { 0.70f, 0.70f, 0.70f, 1.0f };
+
+const rio::BaseVec3f cLightDir = { -0.4531539381f, 0.4226179123f, 0.7848858833f };
+
+const FFLColor cRimColor = { 0.3f, 0.3f, 0.3f, 1.0f };
+const f32 cRimPower = 2.0f;
 
 }
 
@@ -98,22 +249,36 @@ Shader::~Shader()
 
 void Shader::initialize()
 {
-    mShader.load("ffl_shader", rio::Shader::MODE_UNIFORM_REGISTER);
+    mShader.load("FFLShader", rio::Shader::MODE_UNIFORM_REGISTER);
 
-    mVertexUniformLocation[VERTEX_UNIFORM_MVP] = mShader.getVertexUniformLocation("u_mvp");
+    mVertexUniformLocation[VERTEX_UNIFORM_IT]   = mShader.getVertexUniformLocation("u_it");
+    mVertexUniformLocation[VERTEX_UNIFORM_MV]   = mShader.getVertexUniformLocation("u_mv");
+    mVertexUniformLocation[VERTEX_UNIFORM_PROJ] = mShader.getVertexUniformLocation("u_proj");
 
-    mPixelUniformLocation[PIXEL_UNIFORM_CONST1] = mShader.getFragmentUniformLocation("u_const1");
-    mPixelUniformLocation[PIXEL_UNIFORM_CONST2] = mShader.getFragmentUniformLocation("u_const2");
-    mPixelUniformLocation[PIXEL_UNIFORM_CONST3] = mShader.getFragmentUniformLocation("u_const3");
-    mPixelUniformLocation[PIXEL_UNIFORM_MODE]   = mShader.getFragmentUniformLocation("u_mode");
+    mPixelUniformLocation[PIXEL_UNIFORM_CONST1]                     = mShader.getFragmentUniformLocation("u_const1");
+    mPixelUniformLocation[PIXEL_UNIFORM_CONST2]                     = mShader.getFragmentUniformLocation("u_const2");
+    mPixelUniformLocation[PIXEL_UNIFORM_CONST3]                     = mShader.getFragmentUniformLocation("u_const3");
+    mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_AMBIENT]              = mShader.getFragmentUniformLocation("u_light_ambient");
+    mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_DIFFUSE]              = mShader.getFragmentUniformLocation("u_light_diffuse");
+    mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_DIR]                  = mShader.getFragmentUniformLocation("u_light_dir");
+    mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_ENABLE]               = mShader.getFragmentUniformLocation("u_light_enable");
+    mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_SPECULAR]             = mShader.getFragmentUniformLocation("u_light_specular");
+    mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_AMBIENT]           = mShader.getFragmentUniformLocation("u_material_ambient");
+    mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_DIFFUSE]           = mShader.getFragmentUniformLocation("u_material_diffuse");
+    mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR]          = mShader.getFragmentUniformLocation("u_material_specular");
+    mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE]     = mShader.getFragmentUniformLocation("u_material_specular_mode");
+    mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER]    = mShader.getFragmentUniformLocation("u_material_specular_power");
+    mPixelUniformLocation[PIXEL_UNIFORM_MODE]                       = mShader.getFragmentUniformLocation("u_mode");
+    mPixelUniformLocation[PIXEL_UNIFORM_RIM_COLOR]                  = mShader.getFragmentUniformLocation("u_rim_color");
+    mPixelUniformLocation[PIXEL_UNIFORM_RIM_POWER]                  = mShader.getFragmentUniformLocation("u_rim_power");
 
     mSamplerLocation = mShader.getFragmentSamplerLocation("s_texture");
 
-    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_COLOR]     = 0; // mShader.getVertexAttribLocation("a_color")
-    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL]    = 1; // mShader.getVertexAttribLocation("a_normal")
-    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_POSITION]  = 2; // mShader.getVertexAttribLocation("a_position")
-    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT]   = 3; // mShader.getVertexAttribLocation("a_tangent")
-    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD]  = 4; // mShader.getVertexAttribLocation("a_texCoord")
+    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_COLOR]     = mShader.getVertexAttribLocation("a_color");
+    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL]    = mShader.getVertexAttribLocation("a_normal");
+    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_POSITION]  = mShader.getVertexAttribLocation("a_position");
+    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT]   = mShader.getVertexAttribLocation("a_tangent");
+    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD]  = mShader.getVertexAttribLocation("a_texCoord");
 
 #if RIO_IS_CAFE
     GX2InitAttribStream(
@@ -179,7 +344,7 @@ void Shader::initialize()
     FFLSetShaderCallback(&mCallback);
 }
 
-void Shader::bind() const
+void Shader::bind(bool light_enable) const
 {
     mShader.bind();
 #if RIO_IS_CAFE
@@ -189,15 +354,36 @@ void Shader::bind() const
     for (u32 i = 0; i < FFL_ATTRIBUTE_BUFFER_TYPE_MAX; i++)
         RIO_GL_CALL(glDisableVertexAttribArray(i));
 #endif
+
+    mShader.setUniform(cLightDir, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_DIR]);
+    mShader.setUniform(light_enable, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_ENABLE]);
+    mShader.setUniform(getColorUniform(cLightAmbient), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_AMBIENT]);
+    mShader.setUniform(getColorUniform(cLightDiffuse), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_DIFFUSE]);
+    mShader.setUniform(getColorUniform(cLightSpecular), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_SPECULAR]);
+
+    mShader.setUniform(getColorUniform(cRimColor), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_COLOR]);
+    mShader.setUniform(cRimPower, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_POWER]);
 }
 
 void Shader::setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const
 {
+    mShader.setUniform(proj_mtx, mVertexUniformLocation[VERTEX_UNIFORM_PROJ], u32(-1));
+
     rio::Matrix34f mv;
     mv.setMul(static_cast<const rio::Matrix34f&>(view_mtx), static_cast<const rio::Matrix34f&>(model_mtx));
-    rio::Matrix44f mvp;
-    mvp.setMul(static_cast<const rio::Matrix44f&>(proj_mtx), mv);
-    mShader.setUniform(mvp, mVertexUniformLocation[VERTEX_UNIFORM_MVP], u32(-1));
+    rio::Matrix44f mv44;
+    mv44.fromMatrix34(mv);
+    mShader.setUniform(mv44, mVertexUniformLocation[VERTEX_UNIFORM_MV], u32(-1));
+
+    rio::Matrix34f it34 = mv;
+    it34.setInverseTranspose(mv);
+    gramSchmidtOrthonormalizeMtx34(&it34);
+    rio::BaseMtx33f it {
+        it34.m[0][0], it34.m[1][0], it34.m[2][0],
+        it34.m[0][1], it34.m[1][1], it34.m[2][1],
+        it34.m[0][2], it34.m[1][2], it34.m[2][2]
+    };
+    mShader.setUniformColumnMajor(it, mVertexUniformLocation[VERTEX_UNIFORM_IT], u32(-1));
 }
 
 void Shader::applyAlphaTest(bool enable, rio::Graphics::CompareFunc func, f32 ref) const
@@ -240,40 +426,72 @@ void Shader::applyAlphaTestCallback_(void* p_obj, bool enable, rio::Graphics::Co
     static_cast<Shader*>(p_obj)->applyAlphaTest(enable, func, ref);
 }
 
-void Shader::draw_(const FFLDrawParam& draw_param)
+void Shader::bindTexture_(const FFLModulateParam& modulateParam)
 {
-    // Set the culling mode
-    setCulling(draw_param.cullMode);
+    if (modulateParam.pTexture2D != nullptr)
+    {
+        mSampler.linkTexture2D(modulateParam.pTexture2D);
+        mSampler.tryBindFS(mSamplerLocation, 0);
+    }
+}
 
-    // Set the modulation mode uniform
-    mShader.setUniform(s32(draw_param.modulateParam.mode), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MODE]);
+void Shader::setConstColor_(u32 ps_loc, const FFLColor& color)
+{
+    mShader.setUniform(getColorUniform(color), u32(-1), ps_loc);
+}
 
-    // Handle different modulation modes
-    switch (draw_param.modulateParam.mode)
+void Shader::setModulateMode_(FFLModulateMode mode)
+{
+    mShader.setUniform(s32(mode), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MODE]);
+}
+
+void Shader::setModulate_(const FFLModulateParam& modulateParam)
+{
+    setModulateMode_(modulateParam.mode);
+
+    switch (modulateParam.mode)
     {
     case FFL_MODULATE_MODE_0:
     case FFL_MODULATE_MODE_3:
     case FFL_MODULATE_MODE_4:
     case FFL_MODULATE_MODE_5:
-        mShader.setUniform(getColorUniform(*draw_param.modulateParam.pColorR), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_CONST1]);
+        setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST1], *modulateParam.pColorR);
         break;
     case FFL_MODULATE_MODE_2:
-        mShader.setUniform(getColorUniform(*draw_param.modulateParam.pColorR), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_CONST1]);
-        mShader.setUniform(getColorUniform(*draw_param.modulateParam.pColorG), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_CONST2]);
-        mShader.setUniform(getColorUniform(*draw_param.modulateParam.pColorB), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_CONST3]);
+        setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST1], *modulateParam.pColorR);
+        setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST2], *modulateParam.pColorG);
+        setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST3], *modulateParam.pColorB);
         break;
     default:
         break;
     }
 
-    // Bind texture if available
-    if (draw_param.modulateParam.pTexture2D != nullptr)
-    {
-        mSampler.linkTexture2D(draw_param.modulateParam.pTexture2D);
-        mSampler.tryBindFS(mSamplerLocation, 0);
-    }
+    bindTexture_(modulateParam);
+}
 
-    // Bind attribute buffers and draw elements if index buffer is available
+void Shader::setMaterial_(const FFLDrawParam& drawParam)
+{
+    if (drawParam.modulateParam.type >= cMaterialParamSize)
+        return;
+
+    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].ambient), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_AMBIENT]);
+    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].diffuse), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_DIFFUSE]);
+    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].specular), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR]);
+    mShader.setUniform(cMaterialParam[drawParam.modulateParam.type].specularPower, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER]);
+
+    s32 materialSpecularMode = cMaterialParam[drawParam.modulateParam.type].specularMode;
+    if (drawParam.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT].ptr == nullptr)
+        materialSpecularMode = 0;
+
+    mShader.setUniform(materialSpecularMode, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE]);
+}
+
+void Shader::draw_(const FFLDrawParam& draw_param)
+{
+    setCulling(draw_param.cullMode);
+    setModulate_(draw_param.modulateParam);
+    setMaterial_(draw_param);
+
     if (draw_param.primitiveParam.pIndexBuffer != nullptr)
     {
 #if RIO_IS_CAFE
@@ -401,7 +619,15 @@ void Shader::drawCallback_(void* p_obj, const FFLDrawParam& draw_param)
 
 void Shader::setMatrix_(const rio::BaseMtx44f& matrix)
 {
-    mShader.setUniform(matrix, mVertexUniformLocation[VERTEX_UNIFORM_MVP], u32(-1));
+    mShader.setUniform(matrix, mVertexUniformLocation[VERTEX_UNIFORM_PROJ], u32(-1));
+    mShader.setUniformColumnMajor(rio::Matrix44f::ident, mVertexUniformLocation[VERTEX_UNIFORM_MV], u32(-1));
+
+    static const rio::BaseMtx33f ident33 = {
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+    };
+    mShader.setUniformColumnMajor(ident33, mVertexUniformLocation[VERTEX_UNIFORM_IT], u32(-1));
 }
 
 void Shader::setMatrixCallback_(void* p_obj, const rio::BaseMtx44f& matrix)

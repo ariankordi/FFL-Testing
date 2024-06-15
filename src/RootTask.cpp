@@ -289,7 +289,7 @@ void RootTask::createModel_() {
 
     Model::InitArgStoreData arg = {
         .desc = {
-            .resolution = FFLResolution(2048),
+            .resolution = FFLResolution(768),
             .expressionFlag = 1,
             .modelFlag = 1 << 0 | 1 << 1 | 1 << 2,
             .resourceType = FFL_RESOURCE_TYPE_HIGH,
@@ -349,7 +349,7 @@ void RootTask::createModel_(char (*buf)[FFLICHARINFO_SIZE]) {
 
     Model::InitArgStoreData arg = {
         .desc = {
-            .resolution = FFLResolution(2048),
+            .resolution = FFLResolution(1024),
             .expressionFlag = 1,
             .modelFlag = 1 << 0 | 1 << 1 | 1 << 2,
             .resourceType = FFL_RESOURCE_TYPE_HIGH,
@@ -377,25 +377,10 @@ void RootTask::calc_()
     if (!mInitialized)
         return;
 
-    rio::RenderState render_state;
-    const char* transparency = getenv("TRANSPARENCY");
-    if (transparency) {
-        rio::Window::instance()->clearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    } else {
-        // blue-gray-ish
-        rio::Window::instance()->clearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    }
-    rio::Window::instance()->clearDepthStencil();
-    // trans parent cy ?
-    render_state.setBlendEnable(true);
-    render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
-    render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
-    render_state.apply();
-
+    #if RIO_IS_WIN
     // maximum received is the size of FFLiCharInfo
     char buf[sizeof(FFLiCharInfo)];
 
-    #if RIO_IS_WIN
     if (mSocketIsListening &&
         (new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) > 0) {
         // Assuming data directly received is FFLStoreData
@@ -443,13 +428,18 @@ void RootTask::calc_()
 
     // Move the camera around the target clockwise
     // Define the radius of the orbit in the XZ-plane (distance from the target)
-    mCamera.pos().set(
-        // Set the camera's position using the sin and cos functions to move it in a circle around the target
-        std::sin(mCounter) * radius,
-        CENTER_POS.y,
-        // Add a minus sign to the cosine to spin CCW (same as SpinMii)
-        std::cos(mCounter) * radius
-    );
+    const char* noSpin = getenv("NO_SPIN");
+    if (!noSpin) {
+        mCamera.pos().set(
+            // Set the camera's position using the sin and cos functions to move it in a circle around the target
+            std::sin(mCounter) * radius,
+            CENTER_POS.y,
+            // Add a minus sign to the cosine to spin CCW (same as SpinMii)
+            std::cos(mCounter) * radius
+        );
+    } else {
+        mCamera.pos() = CENTER_POS;
+    }
     // Increment the counter to gradually change the camera's position over time
     mCounter += 1.f / 60;
 
@@ -457,9 +447,24 @@ void RootTask::calc_()
     rio::BaseMtx34f view_mtx;
     mCamera.getMatrix(&view_mtx);
 
-    //mpModel->enableSpecialDraw();
+    rio::RenderState render_state;
+    const char* transparency = getenv("TRANSPARENCY");
+    if (transparency) {
+        rio::Window::instance()->clearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        // enable blending for transparency
+        render_state.setBlendEnable(true);
+        render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
+        render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
+        render_state.apply();
+    } else {
+        // blue-gray-ish
+        rio::Window::instance()->clearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    }
+    rio::Window::instance()->clearDepthStencil();
+    //rio::Window::instance()->setSwapInterval(0);  // disable v-sync
 
     if (mpModel != nullptr) {
+        mpModel->enableSpecialDraw();
         mpModel->drawOpa(view_mtx, mProjMtx);
         mpModel->drawXlu(view_mtx, mProjMtx);
     }
@@ -476,7 +481,9 @@ void RootTask::exit_()
     FFLExit();
 
     rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_HIGH]);
-    rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE]);
+    if (mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] != 0) {
+      rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE]);
+    }
 
     mInitialized = false;
 }

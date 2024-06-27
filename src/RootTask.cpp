@@ -13,6 +13,8 @@
 RootTask::RootTask()
     : ITask("FFL Testing")
     , mInitialized(false)
+    // disables occasionally drawing mii and makes non blocking
+    , mServerOnly(getenv("SERVER_ONLY"))
 {
 }
 
@@ -160,8 +162,15 @@ void RootTask::prepare_()
 
         // Calculate matrix
         mProjMtx = proj.getMatrix();
-    }
 
+        rio::PerspectiveProjection projIconBody(
+            10.0f,
+            1000.0f,
+            rio::Mathf::deg2rad(15.0f),
+            1.0f
+        );
+        mProjMtxIconBody = new rio::BaseMtx44f(projIconBody.getMatrix());
+    }
 
     // read Mii data from a folder
     #if RIO_IS_WIN
@@ -232,12 +241,14 @@ void RootTask::prepare_()
             exit(EXIT_FAILURE);
         } else {
             // Set socket to non-blocking mode
-            #ifdef _WIN32
-            u_long mode = 1;
-            ioctlsocket(server_fd, FIONBIO, &mode);
-            #else
-            fcntl(server_fd, F_SETFL, O_NONBLOCK);
-            #endif
+            if (!mServerOnly) {
+                #ifdef _WIN32
+                u_long mode = 1;
+                ioctlsocket(server_fd, FIONBIO, &mode);
+                #else
+                fcntl(server_fd, F_SETFL, O_NONBLOCK);
+                #endif
+            }
 
             mSocketIsListening = true;
 
@@ -306,54 +317,25 @@ void RootTask::createModel_() {
         mpModel = nullptr;
     } else {
         mpModel->setScale({ 1.f, 1.f, 1.f });
+        //mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
     }
     mCounter = 0.0f;
 }
 
-#include <codecvt>
-#include <locale>
-
-void RootTask::createModel_(char (*buf)[FFLICHARINFO_SIZE]) {
+void RootTask::createModel_(RenderRequest *buf) {
     FFLCharModelSource modelSource;
     //FFLStoreData storeData; // to be used in case you provide it
-    // initialize charInfo (could also be done with memset)
-    // this will be filled by FFLiStoreDataCFLToCharInfo
-    FFLiCharInfo charInfo;
-    // this will either be our blank new charInfo
-    // ... or it will be redefined to the received buffer
-    FFLiCharInfo* pCharInfo = &charInfo;
 
-
-    FFLResult result = FFLiStoreDataCFLToCharInfo(pCharInfo,
-                    reinterpret_cast<const FFLiStoreDataCFL&>(*buf));
-    if (result != FFL_RESULT_OK) {
-        RIO_LOG("input is not FFLStoreData (failed result %i), treating as FFLiCharInfo\n", result);
-        // not store data, so buf is char info. right?
-        pCharInfo = (FFLiCharInfo*)buf;
-    }
-    // at this point it should either be charinfo or converted from it
-    //modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
-    modelSource.dataSource = FFL_DATA_SOURCE_BUFFER; // i.e. CharInfo
     modelSource.index = 0;
-    modelSource.pBuffer = pCharInfo; //&storeData;
+    modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
+    modelSource.pBuffer = &buf->storeData;
 
-    // Convert UTF-16 to UTF-8
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-    // print in bold
-    RIO_LOG("\033[1mLoaded Mii: %s\033[0m\n",
-            convert.to_bytes((char16_t*) pCharInfo->name).c_str());
-    // close connection which should happen as soon as we read it
-    #if RIO_IS_WIN && defined(_WIN32)
-        closesocket(new_socket);
-    #elif RIO_IS_WIN
-        close(new_socket);
-    #endif
+
     // otherwise just fall through and use default
-
     Model::InitArgStoreData arg = {
         .desc = {
-            .resolution = FFLResolution(1024),
-            .expressionFlag = 1,
+            .resolution = buf->texResolution,
+            .expressionFlag = buf->expressionFlag,
             .modelFlag = 1 << 0 | 1 << 1 | 1 << 2,
             .resourceType = FFL_RESOURCE_TYPE_HIGH,
         },
@@ -382,7 +364,10 @@ void RootTask::calc_()
 
     #if RIO_IS_WIN
     // maximum received is the size of FFLiCharInfo
-    char buf[sizeof(FFLiCharInfo)];
+    //char buf[sizeof(FFLiCharInfo)];
+    char buf[RENDERREQUEST_SIZE];
+
+    bool hasSocketRequest = false;
 
     if (mSocketIsListening &&
         (new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) > 0) {
@@ -392,12 +377,15 @@ void RootTask::calc_()
             // NOTE: this will store BOTH charinfo AND storedata so uh
             recv(new_socket, buf,
                 // setting read maximum to the size of CharInfo
-                sizeof(FFLiCharInfo), 0);
+                //sizeof(FFLiCharInfo), 0);
+                 RENDERREQUEST_SIZE, 0);
 
-        if (read_bytes >= sizeof(FFLStoreData)) {
-            createModel_(&buf);
+        if (read_bytes == RENDERREQUEST_SIZE) {
+            delete mpModel;
+            hasSocketRequest = true;
+            createModel_(reinterpret_cast<RenderRequest*>(buf));
         } else {
-            RIO_LOG("got a request of length %lu (should be %lu), dropping\n", read_bytes, sizeof(FFLStoreData));
+            RIO_LOG("got a request of length %lu (should be %lu), dropping\n", read_bytes, RENDERREQUEST_SIZE);
             #ifdef _WIN32
                 closesocket(new_socket);
             #else
@@ -408,21 +396,21 @@ void RootTask::calc_()
         // otherwise just fall through and use default
         // when mii is directly in front of the camera
     #endif // RIO_IS_WIN
-        if (mCounter >= rio::Mathf::pi2())
+        if (!mServerOnly && mCounter >= rio::Mathf::pi2())
         {
             delete mpModel;
             createModel_();
         }
     #if RIO_IS_WIN
     }
-    {
+    /*{
         // close connection which should happen as soon as we read it
         #ifdef _WIN32
             closesocket(new_socket);
         #else
             close(new_socket);
         #endif
-    }
+    }*/
     #endif
 
     // Distance in the XZ-plane from the center to the camera position
@@ -441,11 +429,11 @@ void RootTask::calc_()
     // Move the camera around the target clockwise
     // Define the radius of the orbit in the XZ-plane (distance from the target)
     const char* noSpin = getenv("NO_SPIN");
-    if (!noSpin) {
+    if (!noSpin && !mServerOnly) {
         mCamera.pos().set(
             // Set the camera's position using the sin and cos functions to move it in a circle around the target
             std::sin(mCounter) * radius,
-            CENTER_POS.y,
+            CENTER_POS.y * std::sin(mCounter) * 7.5,
             // Add a minus sign to the cosine to spin CCW (same as SpinMii)
             std::cos(mCounter) * radius
         );
@@ -453,27 +441,161 @@ void RootTask::calc_()
         mCamera.pos() = CENTER_POS;
     }
     // Increment the counter to gradually change the camera's position over time
-    mCounter += 1.f / 60;
+    if (!mServerOnly) {
+        mCounter += 1.f / 60;
+    }
 
     // Get the view matrix from the camera, which represents the camera's orientation and position in the world
     rio::BaseMtx34f view_mtx;
     mCamera.getMatrix(&view_mtx);
 
-    rio::RenderState render_state;
-    const char* transparency = getenv("TRANSPARENCY");
-    if (transparency) {
-        rio::Window::instance()->clearColor(0.0f, 0.0f, 0.0f, 0.0f);
-        // enable blending for transparency
-        render_state.setBlendEnable(true);
-        render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
-        render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
-        render_state.apply();
-    } else {
-        // blue-gray-ish
+    if (!mServerOnly) {
         rio::Window::instance()->clearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        rio::Window::instance()->clearDepthStencil();
+        //rio::Window::instance()->setSwapInterval(0);  // disable v-sync
     }
-    rio::Window::instance()->clearDepthStencil();
-    //rio::Window::instance()->setSwapInterval(0);  // disable v-sync
+
+    if (hasSocketRequest) {
+        if (mpModel == nullptr) {
+            /*const char* errMsg = "mpModel == nullptr";
+            send(new_socket, errMsg, strlen(errMsg), 0);
+            */#ifdef _WIN32
+                closesocket(new_socket);
+            #else
+                close(new_socket);
+            #endif
+            return;
+        }
+        mpModel->enableSpecialDraw();
+
+        // hopefully renderrequest is proper
+        RenderRequest* renderRequest = reinterpret_cast<RenderRequest*>(buf);
+
+        rio::BaseMtx44f *projMtx = mProjMtxIconBody;
+        if (renderRequest->isHeadOnly) {
+            projMtx = &mProjMtx;
+        } else {
+            // FFLMakeIconWithBody view
+            mCamera.pos() = { 0.0f, 37.05f, 415.53f };
+            mCamera.at() = { 0.0f, 37.05f, 0.0f };
+            mCamera.setUp({ 0.0f, 1.0f, 0.0f });
+            mCamera.getMatrix(&view_mtx);
+        }
+
+        // Create the render buffer with the desired size
+        rio::RenderBuffer renderBuffer;
+        renderBuffer.setSize(renderRequest->resolution, renderRequest->resolution);
+        RIO_LOG("Render buffer created with size: %dx%d\n", renderBuffer.getSize().x, renderBuffer.getSize().y);
+
+        //rio::Window::instance()->getNativeWindow()->getColorBufferTextureFormat();
+        rio::Texture2D *renderTextureColor = new rio::Texture2D(rio::TEXTURE_FORMAT_R8_G8_B8_A8_UNORM, renderBuffer.getSize().x, renderBuffer.getSize().y, 1);
+        rio::RenderTargetColor renderTargetColor;
+        renderTargetColor.linkTexture2D(*renderTextureColor);
+        renderBuffer.setRenderTargetColor(&renderTargetColor);
+
+        rio::Texture2D *renderTextureDepth = new rio::Texture2D(rio::DEPTH_TEXTURE_FORMAT_R32_FLOAT, renderBuffer.getSize().x, renderBuffer.getSize().y, 1);
+        rio::RenderTargetDepth renderTargetDepth;
+        renderTargetDepth.linkTexture2D(*renderTextureDepth);
+
+        renderBuffer.setRenderTargetDepth(&renderTargetDepth);
+
+        // TODO: prolly wanna add background color to render params
+        /* look... can the consumer add it themselves with transparency?
+         * YEEES!!!!!!!!!!! THEY CAN!!!!!!!
+         * however, it's always faster to do things in the renderer.
+         * so may skippingas well just provide all of the options you can here.
+         * ... including, overlaying fake body image here , eventually.
+         */
+        const rio::Color4f clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+        renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, clearColor);
+
+        // Bind the render buffer
+        renderBuffer.bind();
+
+        RIO_LOG("Render buffer bound.\n");
+
+        // Render the first frame to the buffer
+        mpModel->drawOpa(view_mtx, *projMtx);
+        RIO_LOG("drawOpa rendered to the buffer.\n");
+
+        // draw xlu mask only after body is drawn
+        // in case there are elements of the mask that go in the body region
+        mpModel->drawXlu(view_mtx, *projMtx);
+        RIO_LOG("drawXlu rendered to the buffer.\n");
+
+        // Read the rendered data into a buffer and save it to a file
+        //std::vector<u8> pixelData(renderBuffer.getSize().x * renderBuffer.getSize().y * 4);
+        //int bufferSize = renderBuffer.getSize().x * renderBuffer.getSize().y * 4; // Assuming 4 bytes per pixel (RGBA)
+        int bufferSize = renderRequest->resolution * renderRequest->resolution * 4;
+        u8* readBuffer = new u8[bufferSize];
+        //rio::MemUtil::set(readBuffer, 0xFF, bufferSize);
+
+        renderBuffer.read(0, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
+
+        RIO_LOG("Rendered data read successfully from the buffer.\n");
+
+        // Save pixelData to /dev/shm/buffer
+        /*std::ofstream outFile("/dev/shm/buffer", std::ios::binary);
+        if (outFile.is_open()) {
+            outFile.write(reinterpret_cast<char*>(readBuffer), bufferSize);
+            outFile.close();
+            RIO_LOG("Rendered data saved to /dev/shm/buffer successfully.\n");
+        } else {
+            RIO_LOG("Failed to open /dev/shm/buffer for writing.\n");
+        }*/
+        send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
+
+        #ifdef RIO_IS_WIN
+        //rio::MemUtil::set(readBuffer, 0xFF, bufferSize);
+
+        //glBindFramebuffer(GL_READ_FRAMEBUFFER, renderTextureDepth->getNativeTextureHandle());
+        renderBuffer.bind();
+        RIO_GL_CALL(glReadPixels(0, 0, renderBuffer.getSize().x, renderBuffer.getSize().y, GL_DEPTH_COMPONENT, GL_FLOAT, readBuffer));
+        //renderBuffer.read(0&, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
+        /*std::ofstream outFile2("/dev/shm/buffer2", std::ios::binary);
+        if (outFile2.is_open()) {
+            outFile2.write(reinterpret_cast<char*>(readBuffer), bufferSize);
+            outFile2.close();
+            RIO_LOG("Rendered data saved to /dev/shm/buffer2 successfully.\n");
+        } else {
+            RIO_LOG("Failed to open /dev/shm/buffer2 for writing.\n");
+        }*/
+        send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
+        #endif
+        delete[] readBuffer;
+
+        hasSocketRequest = false;
+
+        // Unbind the render buffer
+        renderBuffer.getRenderTargetColor()->invalidateGPUCache();
+        renderBuffer.getRenderTargetDepth()->invalidateGPUCache();
+        renderTextureColor->setCompMap(0x00010205);
+        // Clean up
+        delete renderTextureColor;
+        delete renderTextureDepth;
+        RIO_LOG("Render buffer unbound and GPU cache invalidated.\n");
+/*
+        rio::Window::instance()->makeContextCurrent();
+
+        u32 width = rio::Window::instance()->getWidth();
+        u32 height = rio::Window::instance()->getHeight();
+
+        rio::Graphics::setViewport(0, 0, width, height);
+        rio::Graphics::setScissor(0, 0, width, height);
+        RIO_LOG("Viewport and scissor reset to window dimensions: %dx%d\n", width, height);
+
+*/
+        //firstFrame = false;
+        {
+            // close connection which should happen as soon as we read it
+            #ifdef _WIN32
+                closesocket(new_socket);
+            #else
+                close(new_socket);
+            #endif
+        }
+        return;
+    }
 
     if (mpModel != nullptr) {
         mpModel->enableSpecialDraw();

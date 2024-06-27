@@ -182,5 +182,5 @@ void Model::initializeGpu_(const Shader& shader)
     // disable light when rendering faceline textures
     mpShader->bind(false);
     FFLInitCharModelGPUStep(mpCharModel);
-    rio::Window::instance()->makeContextCurrent();
+    //rio::Window::instance()->makeContextCurrent();
 }

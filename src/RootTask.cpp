@@ -328,9 +328,6 @@ void RootTask::createModel_() {
 
 #include <mii_ext_MiiPort.h>
 
-void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src);
-void convertStudioToCharInfoNX(charInfo *dest, const charInfoStudio *src);
-
 void RootTask::createModel_(RenderRequest *buf) {
     FFLCharModelSource modelSource;
     //FFLStoreData storeData; // to be used in case you provide it
@@ -673,7 +670,12 @@ void RootTask::calc_()
 
         // Create the render buffer with the desired size
         rio::RenderBuffer renderBuffer;
-        renderBuffer.setSize(renderRequest->resolution, renderRequest->resolution);
+        //renderBuffer.setSize(renderRequest->resolution * 2, renderRequest->resolution * 2);
+        int ssaaFactor = 2;  // Super Sampling factor, e.g., 2 for 2x SSAA
+        int width = renderRequest->resolution * ssaaFactor;
+        int height = renderRequest->resolution * ssaaFactor;
+
+        renderBuffer.setSize(width, height);
         RIO_LOG("Render buffer created with size: %dx%d\n", renderBuffer.getSize().x, renderBuffer.getSize().y);
 
         //rio::Window::instance()->getNativeWindow()->getColorBufferTextureFormat();
@@ -689,28 +691,24 @@ void RootTask::calc_()
         renderBuffer.setRenderTargetDepth(&renderTargetDepth);
 
 /*
-        // Initialize MSAA
-        const int MSAA_SAMPLES = 4; // Set your desired MSAA sample count here
+    // Create multisampled framebuffer for head rendering
+    GLuint msaaFBO, msaaColorRBO, msaaDepthRBO;
+    GLsizei samples = 4; // You can adjust this value
 
-        // Create MSAA framebuffer
-        GLuint msaaFBO, msaaColorBuffer, msaaDepthBuffer;
-        RIO_GL_CALL(glGenFramebuffers(1, &msaaFBO));
-        RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, msaaFBO));
+    RIO_GL_CALL(glGenFramebuffers(1, &msaaFBO));
+    RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, msaaFBO));
 
-        // Create MSAA color buffer
-        RIO_GL_CALL(glGenTextures(1, &msaaColorBuffer));
-        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msaaColorBuffer));
-        RIO_GL_CALL(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, MSAA_SAMPLES, GL_RGBA8, renderRequest->resolution, renderRequest->resolution, GL_TRUE));
-        RIO_GL_CALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, msaaColorBuffer, 0));
+    RIO_GL_CALL(glGenRenderbuffers(1, &msaaColorRBO));,
+    RIO_GL_CALL(glBindRenderbuffer(GL_RENDERBUFFER, msaaColorRBO));
+    RIO_GL_CALL(glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, renderBuffer.getSize().x, renderBuffer.getSize().y));
+    RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, msaaColorRBO));
 
-        // Create MSAA depth buffer
-        RIO_GL_CALL(glGenTextures(1, &msaaDepthBuffer));
-        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msaaDepthBuffer));
-        RIO_GL_CALL(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, MSAA_SAMPLES, GL_DEPTH_COMPONENT24, renderRequest->resolution, renderRequest->resolution, GL_TRUE));
-        RIO_GL_CALL(glFramebufferTexture2D
-(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D_MULTISAMPLE, msaaDepthBuffer, 0));
+    RIO_GL_CALL(glGenRenderbuffers(1, &msaaDepthRBO));
+    RIO_GL_CALL(glBindRenderbuffer(GL_RENDERBUFFER, msaaDepthRBO));
+    RIO_GL_CALL(glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT32F, renderBuffer.getSize().x, renderBuffer.getSize().y));
+    RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, msaaDepthRBO));
+
 */
-
         //const rio::Color4f clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
         renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, renderRequest->backgroundColor);
 
@@ -719,12 +717,12 @@ void RootTask::calc_()
 /*        RIO_GL_CALL(glViewport(0, 0, renderRequest->resolution, renderRequest->resolution));
 
         // Bind MSAA framebuffer
-        /*RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, msaaFBO));
-        RIO_GL_CALL(glViewport(0, 0, renderRequest->resolution, renderRequest->resolution));
+        //RIO_GL_CALL(glViewport(0, 0, renderRequest->resolution, renderRequest->resolution));
+        glBindFramebuffer(GL_FRAMEBUFFER, msaaFBO);
 
         // Clear the buffer
-        RIO_GL_CALL(glClearColor(renderRequest->backgroundColor.r, renderRequest->backgroundColor.g, renderRequest->backgroundColor.b, renderRequest->backgroundColor.a));
-        RIO_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+        glClearColor(renderRequest->backgroundColor.r, renderRequest->backgroundColor.g, renderRequest->backgroundColor.b, renderRequest->backgroundColor.a);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 */
         RIO_LOG("Render buffer bound.\n");
 
@@ -736,6 +734,7 @@ void RootTask::calc_()
 //GLuint bodyTexture = loadRawRGBAImage();
 
 // draw body?
+
 if (!renderRequest->isHeadOnly)
 {
 
@@ -783,7 +782,7 @@ if (!renderRequest->isHeadOnly)
         /*
         // Bind textures
         RIO_GL_CALL(glActiveTexture(GL_TEXTURE0));
-        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D, msaaColorBuffer));
+        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msaaColorBuffer));
         RIO_GL_CALL(glUniform1i(glGetUniformLocation(shaderProgram, "headTexture"), 0));
 
         RIO_GL_CALL(glActiveTexture(GL_TEXTURE1));
@@ -791,11 +790,11 @@ if (!renderRequest->isHeadOnly)
         RIO_GL_CALL(glUniform1i(glGetUniformLocation(shaderProgram, "bodyTexture"), 1));
 
         RIO_GL_CALL(glActiveTexture(GL_TEXTURE2));
-        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D, msaaDepthBuffer));
+        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msaaDepthBuffer));
         RIO_GL_CALL(glUniform1i(glGetUniformLocation(shaderProgram, "depthTexture"), 2));
 
         RIO_GL_CALL(glUniform1f(glGetUniformLocation(shaderProgram, "threshold"), 0.986f));
-        */
+*/
         shader.setUniform(0.986f, u32(-1), shader.getFragmentUniformLocation("threshold"));
 
         // Render a full-screen quad to blend the head and body
@@ -851,46 +850,116 @@ if (!renderRequest->isHeadOnly)
         mpModel->drawXlu(view_mtx, *projMtx);
         RIO_LOG("drawXlu rendered to the buffer.\n");
 
+
+        rio::RenderBuffer renderBufferDownsample;
+        renderBufferDownsample.setSize(renderRequest->resolution, renderRequest->resolution);
+
+        RIO_GL_CALL(glViewport(0, 0, renderRequest->resolution, renderRequest->resolution));
+
+        //rio::Window::instance()->getNativeWindow()->getColorBufferTextureFormat();
+        rio::Texture2D *renderTextureDownsampleColor = new rio::Texture2D(rio::TEXTURE_FORMAT_R8_G8_B8_A8_UNORM, renderBufferDownsample.getSize().x, renderBufferDownsample.getSize().y, 1);
+        rio::RenderTargetColor renderTargetDownsampleColor;
+        renderTargetDownsampleColor.linkTexture2D(*renderTextureDownsampleColor);
+        renderBufferDownsample.setRenderTargetColor(&renderTargetDownsampleColor);
+
+        renderBufferDownsample.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, renderRequest->backgroundColor);
+        renderBufferDownsample.bind();
+
+        rio::RenderState render_state;
+        render_state.setBlendEnable(true);
+        //render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
+        /*render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE);
+        render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE);
+        */
+        render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
+        //render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_CONSTANT_ALPHA);
+        render_state.apply();
+
+        // Load and compile the downsampling shader
+        rio::Shader downsampleShader;
+        downsampleShader.load("downsample_shader");
+        downsampleShader.bind();
+
+// Bind the high-resolution texture
+rio::TextureSampler2D highResSampler;
+highResSampler.linkTexture2D(renderTextureColor);
+highResSampler.tryBindFS(downsampleShader.getFragmentSamplerLocation("highResTexture"), 0);
+
+// Set shader uniforms if needed
+downsampleShader.setUniform(ssaaFactor, u32(-1), downsampleShader.getFragmentUniformLocation("ssaaFactor"));
+
+// Render a full-screen quad to apply the downsampling shader
+GLuint quadVAO, quadVBO;
+float quadVertices[] = {
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    -1.0f, -1.0f,  0.0f, 0.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+    -1.0f,  1.0f,  0.0f, 1.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+     1.0f,  1.0f,  1.0f, 1.0f
+};
+
+RIO_GL_CALL(glGenVertexArrays(1, &quadVAO));
+RIO_GL_CALL(glGenBuffers(1, &quadVBO));
+RIO_GL_CALL(glBindVertexArray(quadVAO));
+RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, quadVBO));
+RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW));
+RIO_GL_CALL(glEnableVertexAttribArray(0));
+RIO_GL_CALL(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0));
+RIO_GL_CALL(glEnableVertexAttribArray(1));
+RIO_GL_CALL(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float))));
+
+RIO_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
+
+RIO_GL_CALL(glBindVertexArray(0));
+
+// Unbind the framebuffer
+RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+
+// Clean up
+RIO_GL_CALL(glDeleteVertexArrays(1, &quadVAO));
+RIO_GL_CALL(glDeleteBuffers(1, &quadVBO));
+
+downsampleShader.unload();
+
+
+
         // Read the rendered data into a buffer and save it to a file
         //std::vector<u8> pixelData(renderBuffer.getSize().x * renderBuffer.getSize().y * 4);
         //int bufferSize = renderBuffer.getSize().x * renderBuffer.getSize().y * 4; // Assuming 4 bytes per pixel (RGBA)
         int bufferSize = renderRequest->resolution * renderRequest->resolution * 4;
         u8* readBuffer = new u8[bufferSize];
         //rio::MemUtil::set(readBuffer, 0xFF, bufferSize);
+/*
+        // Create a regular framebuffer to resolve the MSAA buffer to
+        GLuint resolveFBO, resolveColorRBO;
+        glGenFramebuffers(1, &resolveFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, resolveFBO);
 
-        renderBuffer.read(0, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
+        // Create and attach a regular color renderbuffer
+        glGenRenderbuffers(1, &resolveColorRBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, renderRequest->resolution, renderRequest->resolution);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRBO);
+
+
+        // Blit (resolve) the multisampled framebuffer to the regular framebuffer
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, msaaFBO);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFBO);
+        glBlitFramebuffer(0, 0, renderRequest->resolution, renderRequest->resolution,
+                        0, 0, renderRequest->resolution, renderRequest->resolution,
+                        GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, resolveFBO);
+
+        RIO_GL_CALL(glReadPixels(0, 0, renderRequest->resolution, renderRequest->resolution, GL_RGBA, GL_UNSIGNED_BYTE, readBuffer));
+*/
+        renderBufferDownsample.read(0, readBuffer, renderBufferDownsample.getSize().x, renderBufferDownsample.getSize().y, renderTextureDownsampleColor->getNativeTexture().surface.nativeFormat);
+        //renderBuffer.read(0, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
 
         RIO_LOG("Rendered data read successfully from the buffer.\n");
-
-        // Save pixelData to /dev/shm/buffer
-        /*std::ofstream outFile("/dev/shm/buffer", std::ios::binary);
-        if (outFile.is_open()) {
-            outFile.write(reinterpret_cast<char*>(readBuffer), bufferSize);
-            outFile.close();
-            RIO_LOG("Rendered data saved to /dev/shm/buffer successfully.\n");
-        } else {
-            RIO_LOG("Failed to open /dev/shm/buffer for writing.\n");
-        }*/
         send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
 
-        #ifdef RIO_IS_WIN
-        /*
-        //rio::MemUtil::set(readBuffer, 0xFF, bufferSize);
-
-        //glBindFramebuffer(GL_READ_FRAMEBUFFER, renderTextureDepth->getNativeTextureHandle());
-        renderBuffer.bind();
-        RIO_GL_CALL(glReadPixels(0, 0, renderBuffer.getSize().x, renderBuffer.getSize().y, GL_DEPTH_COMPONENT, GL_FLOAT, readBuffer));
-        //renderBuffer.read(0&, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
-        /*std::ofstream outFile2("/dev/shm/buffer2", std::ios::binary);
-        if (outFile2.is_open()) {
-            outFile2.write(reinterpret_cast<char*>(readBuffer), bufferSize);
-            outFile2.close();
-            RIO_LOG("Rendered data saved to /dev/shm/buffer2 successfully.\n");
-        } else {
-            RIO_LOG("Failed to open /dev/shm/buffer2 for writing.\n");
-        }*/
-        //send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
-        #endif
         delete[] readBuffer;
 
         hasSocketRequest = false;
@@ -902,25 +971,15 @@ if (!renderRequest->isHeadOnly)
         delete renderTextureColor;
         delete renderTextureDepth;
         // Clean up
-        /*RIO_GL_CALL(glDeleteFramebuffers(1, &msaaFBO));
-        RIO_GL_CALL(glDeleteTextures(1, &msaaColorBuffer));
-        RIO_GL_CALL(glDeleteTextures(1, &msaaDepthBuffer));
-        RIO_GL_CALL(glDeleteFramebuffers(1, &resolveFBO));
-        RIO_GL_CALL(glDeleteTextures(1, &resolveColorBuffer));
+        /*glDeleteFramebuffers(1, &msaaFBO);
+        glDeleteRenderbuffers(1, &msaaColorRBO);
+        glDeleteRenderbuffers(1, &msaaDepthRBO);
+        glDeleteFramebuffers(1, &resolveFBO);
+        glDeleteRenderbuffers(1, &resolveColorRBO);
 */
 
         RIO_LOG("Render buffer unbound and GPU cache invalidated.\n");
-/*
-        rio::Window::instance()->makeContextCurrent();
 
-        u32 width = rio::Window::instance()->getWidth();
-        u32 height = rio::Window::instance()->getHeight();
-
-        rio::Graphics::setViewport(0, 0, width, height);
-        rio::Graphics::setScissor(0, 0, width, height);
-        RIO_LOG("Viewport and scissor reset to window dimensions: %dx%d\n", width, height);
-
-*/
         //firstFrame = false;
         {
             // close connection which should happen as soon as we read it

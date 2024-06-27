@@ -322,3 +322,7 @@ typedef struct {
     u8 nose_type;         // Nose type
     u8 nose_y;            // Nose Y (vertical) position
 } charInfoStudio;
+
+// DataUtils.cpp
+void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src);
+void convertStudioToCharInfoNX(charInfo *dest, const charInfoStudio *src);

@@ -24,13 +24,13 @@ import (
 
 var (
 	mysqlAvailable   = false
-	db                 *sql.DB
-	upstreamTCP        string
-	useXForwardedFor   bool
+	db               *sql.DB
+	upstreamTCP      string
+	useXForwardedFor bool
 )
 
 const (
-	FFLResolutionMask           = 0x3fffffff
+	FFLResolutionMask             = 0x3fffffff
 	FFLResolutionMipmapEnableMask = 1 << 30
 )
 
@@ -55,7 +55,6 @@ func main() {
 	mysqlConnStr := flag.String("mysql", "", "MySQL connection string")
 	upstreamAddr := flag.String("upstream", "localhost:12346", "Upstream TCP server address")
 	flag.BoolVar(&useXForwardedFor, "use-x-forwarded-for", false, "Use X-Forwarded-For header for client IP")
-
 
 	flag.Parse()
 
@@ -175,14 +174,14 @@ func logRequest(handler http.Handler) http.Handler {
 				latencyColor, latency, ANSIReset,
 			)*/
 			fmt.Println(clientIPColor + clientIP + ANSIReset +
-			" - - [" + start.Format("02/Jan/2006:15:04:05 -0700") + "] \"" +
-			ANSIGreen + r.Method + " " + r.URL.Path + queryColored + " " + ANSIReset +
-			ANSIFaint + r.Proto + ANSIReset + "\" " +
-			statusColor + fmt.Sprint(status) + ANSIReset + " " +
-			fmt.Sprint(r.ContentLength) + " \"" +
-			ANSIPurple + r.Referer() + ANSIReset + "\" \"" +
-			ANSIFaint + r.UserAgent() + ANSIReset + "\" " +
-			latencyColor + fmt.Sprint(latency) + ANSIReset)
+				" - - [" + start.Format("02/Jan/2006:15:04:05 -0700") + "] \"" +
+				ANSIGreen + r.Method + " " + r.URL.Path + queryColored + " " + ANSIReset +
+				ANSIFaint + r.Proto + ANSIReset + "\" " +
+				statusColor + fmt.Sprint(status) + ANSIReset + " " +
+				fmt.Sprint(r.ContentLength) + " \"" +
+				ANSIPurple + r.Referer() + ANSIReset + "\" \"" +
+				ANSIFaint + r.UserAgent() + ANSIReset + "\" " +
+				latencyColor + fmt.Sprint(latency) + ANSIReset)
 		} else {
 			// apache/nginx request format with latency at the end
 			/*fmt.Printf("%s - - [%s] \"%s %s %s\" %d %d \"%s\" \"%s\" %s\n",
@@ -196,10 +195,10 @@ func logRequest(handler http.Handler) http.Handler {
 				latency,
 			)*/
 			fmt.Println(clientIP + " - - [" + start.Format("02/Jan/2006:15:04:05 -0700") + "] \"" +
-			r.Method + " " + r.RequestURI + " " + r.Proto + "\" " +
-			fmt.Sprint(status) + " " + fmt.Sprint(r.ContentLength) + " \"" +
-			r.Referer() + "\" \"" + r.UserAgent() + "\" " +
-			fmt.Sprint(latency))
+				r.Method + " " + r.RequestURI + " " + r.Proto + "\" " +
+				fmt.Sprint(status) + " " + fmt.Sprint(r.ContentLength) + " \"" +
+				r.Referer() + "\" \"" + r.UserAgent() + "\" " +
+				fmt.Sprint(latency))
 		}
 	})
 }
@@ -262,7 +261,6 @@ func colorQueryParameters(query string) string {
 	return strings.Join(coloredParams, "&")
 }
 
-
 // renderImage handles the /render.png endpoint
 func renderImage(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -271,10 +269,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	if type_ == "" {
 		type_ = "face"
 	}
-	expressionFlagStr := query.Get("expression")
-	if expressionFlagStr == "" || expressionFlagStr == "normal" {
-		expressionFlagStr = "1"
-	}
+	expressionStr := query.Get("expression")
 	widthStr := query.Get("width")
 	if widthStr == "" {
 		widthStr = "1024"
@@ -336,10 +331,10 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 
 	// Data length validation
 	/*
-	if len(storeData) != 96 {
-		http.Error(w, "fflstoredata must be 96 bytes please", http.StatusBadRequest)
-		return
-	}
+		if len(storeData) != 96 {
+			http.Error(w, "fflstoredata must be 96 bytes please", http.StatusBadRequest)
+			return
+		}
 	*/
 	if len(storeData) < 46 || len(storeData) > 96 {
 		http.Error(w, "data length should be between 46-96 bytes (TODO: ACCOMODATE nn::mii::detail::CoreDataRaw)", http.StatusBadRequest)
@@ -351,14 +346,15 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	mipmapEnable := mipmapEnableStr == "1"
 
 	// Parsing and validating expression flag
-	expressionFlag, err := strconv.Atoi(expressionFlagStr)
+	/*expressionFlag, err := strconv.Atoi(expressionFlagStr)
 	if err != nil {
 		http.Error(w, `oh, sorry... expression is the expression FLAG, not the name of the expression. find the values at https://github.com/ariankordi/nwf-mii-cemu-toy/blob/master/nwf-app/js/render-listener.js#L138`, http.StatusBadRequest)
 		return
 	}
 	if expressionFlag < 1 {
 		expressionFlag = 1
-	}
+	}*/
+	expressionFlag := getExpressionFlag(expressionStr)
 
 	// Parsing and validating width
 	width, err := strconv.Atoi(widthStr)
@@ -394,7 +390,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		IsHeadOnly:      isHeadOnly,
 		ExpressionFlag:  uint32(expressionFlag),
 		ResourceType:    uint32(resourceType),
-		 BackgroundColor: [4]float32{0, 0, 0, 0},
+		BackgroundColor: [4]float32{0, 0, 0, 0},
 	}
 
 	// Enabling mipmap if specified
@@ -518,86 +514,85 @@ func sendRenderRequest(request RenderRequest) ([]byte, error) {
 	return receivedData, nil
 }
 
-
 // Expression constants
 const (
-    FFL_EXPRESSION_NORMAL                = 0
-    FFL_EXPRESSION_SMILE                 = 1
-    FFL_EXPRESSION_ANGER                 = 2
-    FFL_EXPRESSION_SORROW                = 3
-    FFL_EXPRESSION_SURPRISE              = 4
-    FFL_EXPRESSION_BLINK                 = 5
-    FFL_EXPRESSION_OPEN_MOUTH            = 6
-    FFL_EXPRESSION_HAPPY                 = 7
-    FFL_EXPRESSION_ANGER_OPEN_MOUTH      = 8
-    FFL_EXPRESSION_SORROW_OPEN_MOUTH     = 9
-    FFL_EXPRESSION_SURPRISE_OPEN_MOUTH   = 10
-    FFL_EXPRESSION_BLINK_OPEN_MOUTH      = 11
-    FFL_EXPRESSION_WINK_LEFT             = 12
-    FFL_EXPRESSION_WINK_RIGHT            = 13
-    FFL_EXPRESSION_WINK_LEFT_OPEN_MOUTH  = 14
-    FFL_EXPRESSION_WINK_RIGHT_OPEN_MOUTH = 15
-    FFL_EXPRESSION_LIKE                  = 16
-    FFL_EXPRESSION_LIKE_WINK_RIGHT       = 17
-    FFL_EXPRESSION_FRUSTRATED            = 18
+	FFL_EXPRESSION_NORMAL                = 0
+	FFL_EXPRESSION_SMILE                 = 1
+	FFL_EXPRESSION_ANGER                 = 2
+	FFL_EXPRESSION_SORROW                = 3
+	FFL_EXPRESSION_SURPRISE              = 4
+	FFL_EXPRESSION_BLINK                 = 5
+	FFL_EXPRESSION_OPEN_MOUTH            = 6
+	FFL_EXPRESSION_HAPPY                 = 7
+	FFL_EXPRESSION_ANGER_OPEN_MOUTH      = 8
+	FFL_EXPRESSION_SORROW_OPEN_MOUTH     = 9
+	FFL_EXPRESSION_SURPRISE_OPEN_MOUTH   = 10
+	FFL_EXPRESSION_BLINK_OPEN_MOUTH      = 11
+	FFL_EXPRESSION_WINK_LEFT             = 12
+	FFL_EXPRESSION_WINK_RIGHT            = 13
+	FFL_EXPRESSION_WINK_LEFT_OPEN_MOUTH  = 14
+	FFL_EXPRESSION_WINK_RIGHT_OPEN_MOUTH = 15
+	FFL_EXPRESSION_LIKE                  = 16
+	FFL_EXPRESSION_LIKE_WINK_RIGHT       = 17
+	FFL_EXPRESSION_FRUSTRATED            = 18
 )
 
 // Expression flag constants
 const (
-    FFL_EXPRESSION_FLAG_NORMAL                = 1 << FFL_EXPRESSION_NORMAL
-    FFL_EXPRESSION_FLAG_SMILE                 = 1 << FFL_EXPRESSION_SMILE
-    FFL_EXPRESSION_FLAG_ANGER                 = 1 << FFL_EXPRESSION_ANGER
-    FFL_EXPRESSION_FLAG_SORROW                = 1 << FFL_EXPRESSION_SORROW
-    FFL_EXPRESSION_FLAG_SURPRISE              = 1 << FFL_EXPRESSION_SURPRISE
-    FFL_EXPRESSION_FLAG_BLINK                 = 1 << FFL_EXPRESSION_BLINK
-    FFL_EXPRESSION_FLAG_OPEN_MOUTH            = 1 << FFL_EXPRESSION_OPEN_MOUTH
-    FFL_EXPRESSION_FLAG_HAPPY                 = 1 << FFL_EXPRESSION_HAPPY
-    FFL_EXPRESSION_FLAG_ANGER_OPEN_MOUTH      = 1 << FFL_EXPRESSION_ANGER_OPEN_MOUTH
-    FFL_EXPRESSION_FLAG_SORROW_OPEN_MOUTH     = 1 << FFL_EXPRESSION_SORROW_OPEN_MOUTH
-    FFL_EXPRESSION_FLAG_SURPRISE_OPEN_MOUTH   = 1 << FFL_EXPRESSION_SURPRISE_OPEN_MOUTH
-    FFL_EXPRESSION_FLAG_BLINK_OPEN_MOUTH      = 1 << FFL_EXPRESSION_BLINK_OPEN_MOUTH
-    FFL_EXPRESSION_FLAG_WINK_LEFT             = 1 << FFL_EXPRESSION_WINK_LEFT
-    FFL_EXPRESSION_FLAG_WINK_RIGHT            = 1 << FFL_EXPRESSION_WINK_RIGHT
-    FFL_EXPRESSION_FLAG_WINK_LEFT_OPEN_MOUTH  = 1 << FFL_EXPRESSION_WINK_LEFT_OPEN_MOUTH
-    FFL_EXPRESSION_FLAG_WINK_RIGHT_OPEN_MOUTH = 1 << FFL_EXPRESSION_WINK_RIGHT_OPEN_MOUTH
-    FFL_EXPRESSION_FLAG_LIKE                  = 1 << FFL_EXPRESSION_LIKE
-    FFL_EXPRESSION_FLAG_LIKE_WINK_RIGHT       = 1 << FFL_EXPRESSION_LIKE_WINK_RIGHT
-    FFL_EXPRESSION_FLAG_FRUSTRATED            = 1 << FFL_EXPRESSION_FRUSTRATED
+	FFL_EXPRESSION_FLAG_NORMAL                = 1 << FFL_EXPRESSION_NORMAL
+	FFL_EXPRESSION_FLAG_SMILE                 = 1 << FFL_EXPRESSION_SMILE
+	FFL_EXPRESSION_FLAG_ANGER                 = 1 << FFL_EXPRESSION_ANGER
+	FFL_EXPRESSION_FLAG_SORROW                = 1 << FFL_EXPRESSION_SORROW
+	FFL_EXPRESSION_FLAG_SURPRISE              = 1 << FFL_EXPRESSION_SURPRISE
+	FFL_EXPRESSION_FLAG_BLINK                 = 1 << FFL_EXPRESSION_BLINK
+	FFL_EXPRESSION_FLAG_OPEN_MOUTH            = 1 << FFL_EXPRESSION_OPEN_MOUTH
+	FFL_EXPRESSION_FLAG_HAPPY                 = 1 << FFL_EXPRESSION_HAPPY
+	FFL_EXPRESSION_FLAG_ANGER_OPEN_MOUTH      = 1 << FFL_EXPRESSION_ANGER_OPEN_MOUTH
+	FFL_EXPRESSION_FLAG_SORROW_OPEN_MOUTH     = 1 << FFL_EXPRESSION_SORROW_OPEN_MOUTH
+	FFL_EXPRESSION_FLAG_SURPRISE_OPEN_MOUTH   = 1 << FFL_EXPRESSION_SURPRISE_OPEN_MOUTH
+	FFL_EXPRESSION_FLAG_BLINK_OPEN_MOUTH      = 1 << FFL_EXPRESSION_BLINK_OPEN_MOUTH
+	FFL_EXPRESSION_FLAG_WINK_LEFT             = 1 << FFL_EXPRESSION_WINK_LEFT
+	FFL_EXPRESSION_FLAG_WINK_RIGHT            = 1 << FFL_EXPRESSION_WINK_RIGHT
+	FFL_EXPRESSION_FLAG_WINK_LEFT_OPEN_MOUTH  = 1 << FFL_EXPRESSION_WINK_LEFT_OPEN_MOUTH
+	FFL_EXPRESSION_FLAG_WINK_RIGHT_OPEN_MOUTH = 1 << FFL_EXPRESSION_WINK_RIGHT_OPEN_MOUTH
+	FFL_EXPRESSION_FLAG_LIKE                  = 1 << FFL_EXPRESSION_LIKE
+	FFL_EXPRESSION_FLAG_LIKE_WINK_RIGHT       = 1 << FFL_EXPRESSION_LIKE_WINK_RIGHT
+	FFL_EXPRESSION_FLAG_FRUSTRATED            = 1 << FFL_EXPRESSION_FRUSTRATED
 )
 
 // Map of expression strings to their respective flags
 var expressionMap = map[string]int{
-    "surprise":               FFL_EXPRESSION_FLAG_SURPRISE,
-    "surprise_open_mouth":    FFL_EXPRESSION_FLAG_SURPRISE_OPEN_MOUTH,
-    "wink_left_open_mouth":   FFL_EXPRESSION_FLAG_WINK_LEFT_OPEN_MOUTH,
-    "like":                   FFL_EXPRESSION_FLAG_LIKE,
-    "anger_open_mouth":       FFL_EXPRESSION_FLAG_ANGER_OPEN_MOUTH,
-    "blink_open_mouth":       FFL_EXPRESSION_FLAG_BLINK_OPEN_MOUTH,
-    "anger":                  FFL_EXPRESSION_FLAG_ANGER,
-    "like_wink_left":         FFL_EXPRESSION_FLAG_LIKE,
-    "happy":                  FFL_EXPRESSION_FLAG_HAPPY,
-    "blink":                  FFL_EXPRESSION_FLAG_BLINK,
-    "smile":                  FFL_EXPRESSION_FLAG_SMILE,
-    "sorrow_open_mouth":      FFL_EXPRESSION_FLAG_SORROW_OPEN_MOUTH,
-    "wink_right":             FFL_EXPRESSION_FLAG_WINK_RIGHT,
-    "sorrow":                 FFL_EXPRESSION_FLAG_SORROW,
-    "normal":                 FFL_EXPRESSION_FLAG_NORMAL,
-    "like_wink_right":        FFL_EXPRESSION_FLAG_LIKE_WINK_RIGHT,
-    "wink_right_open_mouth":  FFL_EXPRESSION_FLAG_WINK_RIGHT_OPEN_MOUTH,
-    "smile_open_mouth":       FFL_EXPRESSION_FLAG_HAPPY,
-    "frustrated":             FFL_EXPRESSION_FLAG_FRUSTRATED,
-    "surprised":              FFL_EXPRESSION_FLAG_SURPRISE,
-    "wink_left":              FFL_EXPRESSION_FLAG_WINK_LEFT,
-    "open_mouth":             FFL_EXPRESSION_FLAG_OPEN_MOUTH,
-    "puzzled":                FFL_EXPRESSION_FLAG_SORROW, // assuming PUZZLED is similar to SORROW
-    "normal_open_mouth":      FFL_EXPRESSION_FLAG_OPEN_MOUTH,
+	"surprise":              FFL_EXPRESSION_FLAG_SURPRISE,
+	"surprise_open_mouth":   FFL_EXPRESSION_FLAG_SURPRISE_OPEN_MOUTH,
+	"wink_left_open_mouth":  FFL_EXPRESSION_FLAG_WINK_LEFT_OPEN_MOUTH,
+	"like":                  FFL_EXPRESSION_FLAG_LIKE,
+	"anger_open_mouth":      FFL_EXPRESSION_FLAG_ANGER_OPEN_MOUTH,
+	"blink_open_mouth":      FFL_EXPRESSION_FLAG_BLINK_OPEN_MOUTH,
+	"anger":                 FFL_EXPRESSION_FLAG_ANGER,
+	"like_wink_left":        FFL_EXPRESSION_FLAG_LIKE,
+	"happy":                 FFL_EXPRESSION_FLAG_HAPPY,
+	"blink":                 FFL_EXPRESSION_FLAG_BLINK,
+	"smile":                 FFL_EXPRESSION_FLAG_SMILE,
+	"sorrow_open_mouth":     FFL_EXPRESSION_FLAG_SORROW_OPEN_MOUTH,
+	"wink_right":            FFL_EXPRESSION_FLAG_WINK_RIGHT,
+	"sorrow":                FFL_EXPRESSION_FLAG_SORROW,
+	"normal":                FFL_EXPRESSION_FLAG_NORMAL,
+	"like_wink_right":       FFL_EXPRESSION_FLAG_LIKE_WINK_RIGHT,
+	"wink_right_open_mouth": FFL_EXPRESSION_FLAG_WINK_RIGHT_OPEN_MOUTH,
+	"smile_open_mouth":      FFL_EXPRESSION_FLAG_HAPPY,
+	"frustrated":            FFL_EXPRESSION_FLAG_FRUSTRATED,
+	"surprised":             FFL_EXPRESSION_FLAG_SURPRISE,
+	"wink_left":             FFL_EXPRESSION_FLAG_WINK_LEFT,
+	"open_mouth":            FFL_EXPRESSION_FLAG_OPEN_MOUTH,
+	"puzzled":               FFL_EXPRESSION_FLAG_SORROW, // assuming PUZZLED is similar to SORROW
+	"normal_open_mouth":     FFL_EXPRESSION_FLAG_OPEN_MOUTH,
 }
 
 // Function to map a string input to an expression flag
 func getExpressionFlag(input string) int {
-    input = strings.ToLower(input)
-    if flag, exists := expressionMap[input]; exists {
-        return flag
-    }
-    return FFL_EXPRESSION_FLAG_NORMAL
+	input = strings.ToLower(input)
+	if flag, exists := expressionMap[input]; exists {
+		return flag
+	}
+	return FFL_EXPRESSION_FLAG_NORMAL
 }

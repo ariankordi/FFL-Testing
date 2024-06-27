@@ -27,6 +27,8 @@ public:
     template <typename T>
     bool initialize(const InitArg<T>& arg, const Shader& shader);
 
+    FFLCharModel* getCharModel() const { return mpCharModel; }
+
     void enableSpecialDraw();
 
     void drawOpa(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx);
@@ -70,7 +72,7 @@ private:
     void initializeGpu_(const Shader& shader);
 
 private:
-    FFLCharModel        mCharModel;
+    FFLCharModel*       mpCharModel;
     FFLCharModelDesc    mCharModelDesc;
     FFLCharModelSource  mCharModelSource;
     rio::BaseMtx34f     mMtxRT;

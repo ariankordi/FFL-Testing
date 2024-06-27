@@ -322,15 +322,7 @@ void Shader::initialize()
     GX2InitFetchShaderEx(&mFetchShader, (u8*)buffer, FFL_ATTRIBUTE_BUFFER_TYPE_MAX, mAttribute, GX2_FETCH_SHADER_TESSELLATION_NONE, GX2_TESSELLATION_MODE_DISCRETE);
 #elif RIO_IS_WIN
     RIO_ASSERT(mVAOHandle == GL_NONE);
-
-    // OpenGL <4.5 compatible buffer creation
-    GLuint buffers[FFL_ATTRIBUTE_BUFFER_TYPE_MAX];
-    RIO_GL_CALL(glGenBuffers(FFL_ATTRIBUTE_BUFFER_TYPE_MAX, buffers));
-    for (int i = 0; i < FFL_ATTRIBUTE_BUFFER_TYPE_MAX; ++i) {
-        mVBOHandle[i] = buffers[i];
-    }
-
-    // Generate Vertex Array Object (VAO)
+    RIO_GL_CALL(glGenBuffers(FFL_ATTRIBUTE_BUFFER_TYPE_MAX, mVBOHandle));
     RIO_GL_CALL(glGenVertexArrays(1, &mVAOHandle));
     RIO_ASSERT(mVAOHandle != GL_NONE);
 #endif

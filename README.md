@@ -23,7 +23,7 @@ As of 2024-05-31, I added a Makefile that should more or less "just" work on Lin
     ```
     make -j4
     ```
-    To build with WUT, use: `make wut -j4`
+    To build with WUT, use: `make -f Makefile.wut -j4`
 3. Obtain required files.
     * You'll need to extract the following file from a Wii U:
         - `sys/title/0005001b/10056000/content/FFLResHigh.dat`

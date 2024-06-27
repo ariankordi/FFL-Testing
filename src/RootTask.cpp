@@ -108,6 +108,7 @@ void RootTask::prepare_()
 
             if (!resLoaded) {
                 RIO_LOG("Was not able to load high resource!!!\n");
+                RIO_LOG("\e[1;31mThe FFLResHigh.dat needs to be present, or else this program won't work. It will probably crash right now.\e[0m\n");
                 RIO_ASSERT(false);
             }
         }
@@ -146,6 +147,8 @@ void RootTask::prepare_()
         // C_MTXPerspective(Mtx44 m, f32 fovy, f32 aspect, f32 near, f32 far)
         // PerspectiveProjection(f32 near, f32 far, f32 fovy, f32 aspect)
         // RFLiMakeIcon: C_MTXPerspective(projMtx, fovy, aspect, 500.0f, 700.0f)
+        // GetFaceMatrix: C_MTXPerspective(projMtx, 15.0, 1.0, 10.0, 1000.0);
+
         // Create perspective projection instance
         rio::PerspectiveProjection proj(
             500.0f, // Near
@@ -180,7 +183,7 @@ void RootTask::prepare_()
                 }
             }
         }
-        RIO_LOG("Loaded %d FFSD files into mStoreDataArray\n", mStoreDataArray.size());
+        RIO_LOG("Loaded %lu FFSD files into mStoreDataArray\n", mStoreDataArray.size());
     }
     #endif // RIO_IS_WIN (folder)
 
@@ -204,7 +207,7 @@ void RootTask::prepare_()
             exit(EXIT_FAILURE);
         }
 
-        // Forcefully attaching socket to the port 8080
+        // Forcefully attaching socket to the port
         if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&opt), sizeof(opt))) {
             perror("setsockopt");
             exit(EXIT_FAILURE);
@@ -212,15 +215,15 @@ void RootTask::prepare_()
 
         address.sin_family = AF_INET;
         address.sin_addr.s_addr = INADDR_ANY;
-        // Get port number from environment or use default 8080
+        // Get port number from environment or use default
         const char* env_port = getenv("PORT");
-        int port = env_port ? atoi(env_port) : 8080;
+        int port = env_port ? atoi(env_port) : 12346;
         // Forcefully attaching socket to the port
         address.sin_port = htons(port);
         if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
             perror("bind failed");
             RIO_LOG("\033[1m" \
-            "TIP: Change the default port of 8080 with the PORT environment variable" \
+            "TIP: Change the default port of 12346 with the PORT environment variable" \
             "\033[0m\n");
             exit(EXIT_FAILURE);
         }
@@ -241,7 +244,7 @@ void RootTask::prepare_()
             RIO_LOG("\033[1m" \
             "tcp server listening on port %d\033[0m\n" \
             "\033[2m(you can change the port with the PORT environment variable)\033[0m\n" \
-            "try sending FFLStoreData or FFLiCharInfo (little endian) to it with netcat\n", 
+            "try sending FFLStoreData or FFLiCharInfo (little endian) to it with netcat\n",
             port);
         }
     }
@@ -393,14 +396,15 @@ void RootTask::calc_()
 
         if (read_bytes >= sizeof(FFLStoreData)) {
             createModel_(&buf);
+        } else {
+            RIO_LOG("got a request of length %lu (should be %lu), dropping\n", read_bytes, sizeof(FFLStoreData));
+            #ifdef _WIN32
+                closesocket(new_socket);
+            #else
+                close(new_socket);
+            #endif
         }
     } else {
-        // close connection which should happen as soon as we read it
-        #ifdef _WIN32
-            closesocket(new_socket);
-        #else
-            close(new_socket);
-        #endif
         // otherwise just fall through and use default
         // when mii is directly in front of the camera
     #endif // RIO_IS_WIN
@@ -410,6 +414,14 @@ void RootTask::calc_()
             createModel_();
         }
     #if RIO_IS_WIN
+    }
+    {
+        // close connection which should happen as soon as we read it
+        #ifdef _WIN32
+            closesocket(new_socket);
+        #else
+            close(new_socket);
+        #endif
     }
     #endif
 

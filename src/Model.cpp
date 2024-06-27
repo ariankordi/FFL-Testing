@@ -16,15 +16,17 @@ Model::Model()
     , mIsEnableSpecialDraw(false)
     , mIsInitialized(false)
 {
+    mpCharModel = new FFLCharModel();
 }
 
 Model::~Model()
 {
     if (mIsInitialized)
     {
-        FFLDeleteCharModel(&mCharModel);
+        FFLDeleteCharModel(mpCharModel);
         mIsInitialized = false;
     }
+    delete mpCharModel;
 }
 
 void Model::initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource* p_source)
@@ -92,7 +94,7 @@ void Model::drawOpaNormal_()
     render_state.setBlendFactor(rio::Graphics::BLEND_MODE_ONE, rio::Graphics::BLEND_MODE_ZERO);
     render_state.applyBlendAndFastZ();
 
-    FFLDrawOpa(&mCharModel);
+    FFLDrawOpa(mpCharModel);
 }
 
 void Model::drawOpaSpecial_()
@@ -106,7 +108,7 @@ void Model::drawOpaSpecial_()
     render_state.setColorMask(true, true, true, true);
     render_state.apply();
 
-    FFLDrawOpa(&mCharModel);
+    FFLDrawOpa(mpCharModel);
 }
 
 void Model::drawXluNormal_()
@@ -122,7 +124,7 @@ void Model::drawXluNormal_()
     render_state.setBlendFactor(rio::Graphics::BLEND_MODE_SRC_ALPHA, rio::Graphics::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
     render_state.applyBlendAndFastZ();
 
-    FFLDrawXlu(&mCharModel);
+    FFLDrawXlu(mpCharModel);
 }
 
 void Model::drawXluSpecial_()
@@ -142,7 +144,7 @@ void Model::drawXluSpecial_()
 
         mpShader->applyAlphaTestEnable();
 
-        FFLDrawXlu(&mCharModel);
+        FFLDrawXlu(mpCharModel);
     }
 
     {
@@ -160,13 +162,13 @@ void Model::drawXluSpecial_()
 
         mpShader->applyAlphaTestEnable();
 
-        FFLDrawXlu(&mCharModel);
+        FFLDrawXlu(mpCharModel);
     }
 }
 
 bool Model::initializeCpu_()
 {
-    FFLResult initCharModelResult = FFLInitCharModelCPUStep(&mCharModel, &mCharModelSource, &mCharModelDesc);
+    FFLResult initCharModelResult = FFLInitCharModelCPUStep(mpCharModel, &mCharModelSource, &mCharModelDesc);
     if (initCharModelResult != FFL_RESULT_OK) {
         RIO_LOG("FFLInitCharModelCPUStep returned: %i\n", initCharModelResult);
         return false;
@@ -179,6 +181,6 @@ void Model::initializeGpu_(const Shader& shader)
     mpShader = &shader;
     // disable light when rendering faceline textures
     mpShader->bind(false);
-    FFLInitCharModelGPUStep(&mCharModel);
+    FFLInitCharModelGPUStep(mpCharModel);
     rio::Window::instance()->makeContextCurrent();
 }

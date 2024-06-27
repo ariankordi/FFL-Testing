@@ -7,6 +7,8 @@
 #include <gfx/rio_Graphics.h>
 #include <gpu/rio_RenderState.h>
 
+#include <nn/ffl/FFLiSwapEndian.h>
+
 #include <string>
 #include <array>
 
@@ -31,6 +33,8 @@ RootTask::RootTask()
 #endif
 
 #include <nn/ffl/FFLiMiiData.h>
+#include <nn/ffl/FFLiMiiDataCore.h>
+#include <nn/ffl/FFLiCreateID.h>
 
 #if RIO_IS_WIN
 int server_fd, new_socket;
@@ -60,7 +64,7 @@ void RootTask::prepare_()
         std::string resPath;
         resPath.resize(256);
         // Middle (now being skipped bc it is not even used here)
-        /*{
+        {
             FFLGetResourcePath(resPath.data(), 256, FFL_RESOURCE_TYPE_MIDDLE, false);
             {
                 rio::FileDevice::LoadArg arg;
@@ -79,8 +83,8 @@ void RootTask::prepare_()
                     mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] = arg.read_size;
                 }
             }
-        }*/
-        mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] = 0;
+        }
+        //mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] = 0;
         // High, load from FFL path or current working directory
         {
             // Two different paths
@@ -327,9 +331,82 @@ void RootTask::createModel_(RenderRequest *buf) {
     //FFLStoreData storeData; // to be used in case you provide it
 
     modelSource.index = 0;
-    modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
+    /*modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
     modelSource.pBuffer = &buf->storeData;
+*/
+    FFLiCharInfo charInfo;
+    // this will either be our blank new charInfo
+    // ... or it will be redefined to the received buffer
+    FFLiCharInfo* pCharInfo = &charInfo;
 
+    if (buf->data[0] != 0x03)
+    {
+        // it is NOT FFLiMiiDataCore, it may be RFL tho
+
+        // cast to FFLiMiIDataCoreRFL to check create id
+        FFLiMiiDataCoreRFL& charDataRFL = reinterpret_cast<FFLiMiiDataCoreRFL&>(buf->data);
+        // look at create id to run FFLiIsNTRMiiID
+        // NOTE: FFLiMiiDataCoreRFL2CharInfo is SUPPOSED to check
+        // whether it is an NTR mii id or not and store
+        // the result as pCharInfo->birthPlatform = FFL_BIRTH_PLATFORM_NTR
+        // HOWEVER, it clears out the create ID and runs the compare anyway
+        // the create id is actually not the same size either
+
+
+        // TODO: NOT WORKING ATM
+        /*FFLCreateID* createIDRFL = reinterpret_cast<FFLCreateID*>(charDataRFL.m_CreatorID);
+
+        // test for if it is NTR data
+        bool isNTR = FFLiIsNTRMiiID(createIDRFL);
+        RIO_LOG("IS NTR??? %i\n", isNTR);
+*/
+        // NOTE: NFLCharData for DS can be little endian tho!!!!!!
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        // swap endian for rfl
+        static const FFLiSwapEndianDesc SWAP_ENDIAN_DESC_RFL[] = {
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_Flag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 10 }, // m_Name
+            { FFLI_SWAP_ENDIAN_TYPE_U8,  1 },  // m_Height
+            { FFLI_SWAP_ENDIAN_TYPE_U8,  1 },  // m_Build
+            { FFLI_SWAP_ENDIAN_TYPE_U8,  4 },  // m_CreatorID
+            { FFLI_SWAP_ENDIAN_TYPE_U8,  4 },  // m_SystemID
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_FaceFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_HairFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 2 },  // m_EyebrowFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 2 },  // m_EyeFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_NoseFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_MouthFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_GlassFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_BeardFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_MoleFlag
+            { FFLI_SWAP_ENDIAN_TYPE_U16, 10 } // creator name
+        };
+        FFLiSwapEndianGroup(buf->data, SWAP_ENDIAN_DESC_RFL, sizeof(SWAP_ENDIAN_DESC_RFL) / sizeof(FFLiSwapEndianDesc));
+#endif
+        /*if (pCharInfo->birthPlatform != FFL_BIRTH_PLATFORM_NTR) {
+            // flip endian
+        }
+        isNTR = FFLiIsNTRMiiID(createIDRFL);
+        RIO_LOG("IS NTR (2)??? %i\n", isNTR);
+        */
+        // TODO: HANDLE BOTH BIG AND LITTLE ENDIAN RFL DATA
+        FFLiMiiDataCoreRFL2CharInfo(pCharInfo,
+            charDataRFL,
+            NULL, false
+            //reinterpret_cast<u16*>(&buf->data[0x36]), true // creator name
+            // name offset: https://github.com/SMGCommunity/Petari/blob/53fd4ff9db54cb1c91a96534dcae9f2c2ea426d1/libs/RVLFaceLib/include/RFLi_Types.h#L342
+        );
+    } else {
+        // TODO: SWAP ENDIAN ON WII U OR HANDLE BOTH KINDS
+        FFLiMiiDataCore2CharInfo(pCharInfo,
+            reinterpret_cast<const FFLiMiiDataCore&>(buf->data),
+        // const u16* pCreatorName, bool resetBirthday
+        NULL, false);
+    }
+
+    modelSource.dataSource = FFL_DATA_SOURCE_BUFFER; // i.e. CharInfo
+    modelSource.index = 0;
+    modelSource.pBuffer = pCharInfo;
 
     // otherwise just fall through and use default
     Model::InitArgStoreData arg = {
@@ -337,7 +414,7 @@ void RootTask::createModel_(RenderRequest *buf) {
             .resolution = buf->texResolution,
             .expressionFlag = buf->expressionFlag,
             .modelFlag = 1 << 0 | 1 << 1 | 1 << 2,
-            .resourceType = FFL_RESOURCE_TYPE_HIGH,
+            .resourceType = buf->resourceType,
         },
         .source = modelSource
     };
@@ -355,7 +432,38 @@ void RootTask::createModel_(RenderRequest *buf) {
     mCounter = 0.0f;
 }
 
+void loadRawRGBAImage(const char* filePath, int width, int height, GLuint texture) {
+    std::ifstream file(filePath, std::ios::binary);
 
+    if (!file) {
+        RIO_LOG("Failed to open file: %s\n", filePath);
+        return;
+    }
+
+    int imageSize = width * height * 4; // 4 channels (RGBA)
+    unsigned char* data = new unsigned char[imageSize];
+
+    file.read(reinterpret_cast<char*>(data), imageSize);
+    file.close();
+
+    if (file.gcount() != imageSize) {
+        RIO_LOG("Failed to read the entire file: %s", filePath);
+        delete[] data;
+        return;
+    }
+
+    /*GLuint texture;
+    glGenTextures(1, &texture);
+    */
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    delete[] data;
+
+    return;//texture;
+}
 
 void RootTask::calc_()
 {
@@ -499,6 +607,29 @@ void RootTask::calc_()
 
         renderBuffer.setRenderTargetDepth(&renderTargetDepth);
 
+/*
+        // Initialize MSAA
+        const int MSAA_SAMPLES = 4; // Set your desired MSAA sample count here
+
+        // Create MSAA framebuffer
+        GLuint msaaFBO, msaaColorBuffer, msaaDepthBuffer;
+        RIO_GL_CALL(glGenFramebuffers(1, &msaaFBO));
+        RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, msaaFBO));
+
+        // Create MSAA color buffer
+        RIO_GL_CALL(glGenTextures(1, &msaaColorBuffer));
+        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msaaColorBuffer));
+        RIO_GL_CALL(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, MSAA_SAMPLES, GL_RGBA8, renderRequest->resolution, renderRequest->resolution, GL_TRUE));
+        RIO_GL_CALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, msaaColorBuffer, 0));
+
+        // Create MSAA depth buffer
+        RIO_GL_CALL(glGenTextures(1, &msaaDepthBuffer));
+        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, msaaDepthBuffer));
+        RIO_GL_CALL(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, MSAA_SAMPLES, GL_DEPTH_COMPONENT24, renderRequest->resolution, renderRequest->resolution, GL_TRUE));
+        RIO_GL_CALL(glFramebufferTexture2D
+(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D_MULTISAMPLE, msaaDepthBuffer, 0));
+*/
+
         // TODO: prolly wanna add background color to render params
         /* look... can the consumer add it themselves with transparency?
          * YEEES!!!!!!!!!!! THEY CAN!!!!!!!
@@ -506,18 +637,172 @@ void RootTask::calc_()
          * so may skippingas well just provide all of the options you can here.
          * ... including, overlaying fake body image here , eventually.
          */
-        const rio::Color4f clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
-        renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, clearColor);
+        //const rio::Color4f clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+        renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, renderRequest->backgroundColor);
 
         // Bind the render buffer
         renderBuffer.bind();
 
+        // Bind MSAA framebuffer
+        /*RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, msaaFBO));
+        RIO_GL_CALL(glViewport(0, 0, renderRequest->resolution, renderRequest->resolution));
+
+        // Clear the MSAA framebuffer
+        RIO_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+*/
         RIO_LOG("Render buffer bound.\n");
 
         // Render the first frame to the buffer
         mpModel->drawOpa(view_mtx, *projMtx);
         RIO_LOG("drawOpa rendered to the buffer.\n");
 
+/*
+// Create a normal (non-multisample) framebuffer for resolving MSAA
+GLuint resolveFBO, resolveColorBuffer;
+RIO_GL_CALL(glGenFramebuffers(1, &resolveFBO));
+RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, resolveFBO));
+
+// Create a color buffer for resolving MSAA
+RIO_GL_CALL(glGenTextures(1, &resolveColorBuffer));
+RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D, resolveColorBuffer));
+RIO_GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, renderRequest->resolution, renderRequest->resolution, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr));
+RIO_GL_CALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resolveColorBuffer, 0));
+
+// Resolve MSAA framebuffer to normal framebuffer
+RIO_GL_CALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, msaaFBO));
+RIO_GL_CALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFBO));
+RIO_GL_CALL(glBlitFramebuffer(0, 0, renderRequest->resolution, renderRequest->resolution, 0, 0, renderRequest->resolution, renderRequest->resolution, GL_COLOR_BUFFER_BIT, GL_LINEAR));
+
+// Bind the resolve framebuffer for reading
+RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, resolveFBO));
+*/
+
+
+
+
+
+
+// Render the body image
+//GLuint bodyTexture = loadRawRGBAImage();
+
+// draw body?
+if (!renderRequest->isHeadOnly)
+{
+
+        rio::Texture2D *bodyTexture = new rio::Texture2D(rio::TEXTURE_FORMAT_R8_G8_B8_A8_UNORM, 1600, 1600, 1);
+        int favoriteColorIndex = 11;
+        FFLiCharModel *charModel = reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel());
+
+        favoriteColorIndex = charModel->charInfo.favoriteColor;
+
+        std::string bodyImagePath = "nwf body png/nwf body m " + std::to_string(favoriteColorIndex) + " 1600.png-decoded-rgba-raw";
+
+        loadRawRGBAImage(bodyImagePath.c_str(), 1600, 1600, bodyTexture->getNativeTextureHandle());
+
+        // Enable blending and configure the blend function
+        rio::RenderState render_state;
+        // disable depth write so that the
+        // body texture does not overwrite the head depth
+        render_state.setDepthWriteEnable(false);
+        render_state.setBlendEnable(true);
+        render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
+
+/*
+        render_state.setBlendEnable(true);
+        render_state.setBlendFactorSrcRGB(rio::Graphics::BLEND_MODE_ONE_MINUS_DST_ALPHA);
+        render_state.setBlekdFactorDstRGB(rio::Graphics::BLEND_MODE_DST_ALPHA);
+        render_state.setBlendFactorSrcAlpha(rio::Graphics::BLEND_MODE_ONE);
+        render_state.setBlendFactorDstAlpha(rio::Graphics::BLEND_MODE_ONE);
+        render_state.setBlendEquation(rio::Graphics::BLEND_FUNC_ADD);
+*/
+        render_state.apply();
+
+        rio::Shader shader;
+
+        shader.load("static_body_image_shader");
+
+        shader.bind();
+
+        GLuint shaderProgram = shader.getShaderProgram();
+
+        // Bind textures
+        rio::TextureSampler2D headSampler;
+        headSampler.linkTexture2D(renderTextureColor);
+        headSampler.tryBindFS(shader.getFragmentSamplerLocation("headTexture"), 0);
+
+        rio::TextureSampler2D bodySampler;
+        bodySampler.linkTexture2D(bodyTexture);
+        bodySampler.tryBindFS(shader.getFragmentSamplerLocation("bodyTexture"), 1);
+
+        rio::TextureSampler2D depthSampler;
+        depthSampler.linkTexture2D(renderTextureDepth);
+        depthSampler.tryBindFS(shader.getFragmentSamplerLocation("depthTexture"), 2);
+
+        /*
+        // Bind textures
+        RIO_GL_CALL(glActiveTexture(GL_TEXTURE0));
+        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D, msaaColorBuffer));
+        RIO_GL_CALL(glUniform1i(glGetUniformLocation(shaderProgram, "headTexture"), 0));
+
+        RIO_GL_CALL(glActiveTexture(GL_TEXTURE1));
+        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D, bodyTexture->getNativeTextureHandle()));
+        RIO_GL_CALL(glUniform1i(glGetUniformLocation(shaderProgram, "bodyTexture"), 1));
+
+        RIO_GL_CALL(glActiveTexture(GL_TEXTURE2));
+        RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D, msaaDepthBuffer));
+        RIO_GL_CALL(glUniform1i(glGetUniformLocation(shaderProgram, "depthTexture"), 2));
+
+        RIO_GL_CALL(glUniform1f(glGetUniformLocation(shaderProgram, "threshold"), 0.986f));
+        */
+        shader.setUniform(0.986f, u32(-1), shader.getFragmentUniformLocation("threshold"));
+
+        // Render a full-screen quad to blend the head and body
+        GLuint vao, vbo;
+        float quadVertices[] = {
+            // Positions    // TexCoords
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  0.0f, 0.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            1.0f, -1.0f,  1.0f, 0.0f,
+            1.0f,  1.0f,  1.0f, 1.0f
+        };
+
+        // TODO: SHOULD BE REIMPLEMENTED WITH RIO!!!!
+        // NOTE: REFER TO https://github.com/aboood40091/RIO-Tests/blob/master/04_2D-Texture/src/roottask.cpp#L45
+        // NOTE: HEADERS FOR THAT REFER TO https://github.com/aboood40091/RIO-Tests/blob/master/04_2D-Texture/src/roottask.h
+
+        // rio::VertexArray
+        RIO_GL_CALL(glGenVertexArrays(1, &vao));
+        // rio::VertexBuffer
+        RIO_GL_CALL(glGenBuffers(1, &vbo));
+
+        RIO_GL_CALL(glBindVertexArray(vao));
+        RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo));
+        RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW));
+        RIO_GL_CALL(glEnableVertexAttribArray(0));
+        // rio::VertexStream i think
+        RIO_GL_CALL(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0));
+        RIO_GL_CALL(glEnableVertexAttribArray(1));
+        RIO_GL_CALL(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float))));
+
+        RIO_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
+        //rio::Drawer::DrawArrays(rio::Drawer::PrimitiveMode::TRIANGLES, 0, 6);
+
+        RIO_GL_CALL(glBindVertexArray(0));
+
+        // Clean up
+        RIO_GL_CALL(glDeleteVertexArrays(1, &vao));
+        RIO_GL_CALL(glDeleteBuffers(1, &vbo));
+
+        // Clean up
+        /*delete vertexArray;
+        delete vertexBuffer;
+        */
+        shader.unload();
+        delete bodyTexture;
+}
         // draw xlu mask only after body is drawn
         // in case there are elements of the mask that go in the body region
         mpModel->drawXlu(view_mtx, *projMtx);
@@ -546,6 +831,7 @@ void RootTask::calc_()
         send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
 
         #ifdef RIO_IS_WIN
+        /*
         //rio::MemUtil::set(readBuffer, 0xFF, bufferSize);
 
         //glBindFramebuffer(GL_READ_FRAMEBUFFER, renderTextureDepth->getNativeTextureHandle());
@@ -560,7 +846,7 @@ void RootTask::calc_()
         } else {
             RIO_LOG("Failed to open /dev/shm/buffer2 for writing.\n");
         }*/
-        send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
+        //send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
         #endif
         delete[] readBuffer;
 
@@ -570,9 +856,15 @@ void RootTask::calc_()
         renderBuffer.getRenderTargetColor()->invalidateGPUCache();
         renderBuffer.getRenderTargetDepth()->invalidateGPUCache();
         renderTextureColor->setCompMap(0x00010205);
-        // Clean up
         delete renderTextureColor;
         delete renderTextureDepth;
+        // Clean up
+        /*RIO_GL_CALL(glDeleteFramebuffers(1, &msaaFBO));
+        RIO_GL_CALL(glDeleteTextures(1, &msaaColorBuffer));
+        RIO_GL_CALL(glDeleteTextures(1, &msaaDepthBuffer));
+        RIO_GL_CALL(glDeleteFramebuffers(1, &resolveFBO));
+        RIO_GL_CALL(glDeleteTextures(1, &resolveColorBuffer));
+*/
         RIO_LOG("Render buffer unbound and GPU cache invalidated.\n");
 /*
         rio::Window::instance()->makeContextCurrent();

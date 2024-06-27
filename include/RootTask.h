@@ -14,12 +14,15 @@
 class Model;
 
 struct RenderRequest {
-    FFLStoreData    storeData;
+    //FFLStoreData    storeData;
+    char            data[96];   // just a buffer that accounts for maximum size
     unsigned int    resolution; // resolution for render buffer
     // NOTE: texture resolution can control whether mipmap is enabled (1 << 30)
     FFLResolution   texResolution; // u32, or just uint, i think
     bool            isHeadOnly;
     FFLExpression   expressionFlag; // also just uint
+    FFLResourceType resourceType;
+    rio::Color4f    backgroundColor; // passed to clearcolor
 };
 #define RENDERREQUEST_SIZE sizeof(RenderRequest)
 

@@ -82,9 +82,10 @@ NINTEXUTILS_SRC := $(shell find ninTexUtils/src/ninTexUtils -name '*.c' -o -name
 RIO_SRC := $(shell find rio/src -name '*.c' -o -name '*.cpp')
 FFL_SRC := $(shell find ffl/src -name '*.c' -o -name '*.cpp')
 
+# default simple shader
 SHADER ?= src/Shader.cpp
 # Main source
-SRC := src/main.cpp src/Model.cpp src/RootTask.cpp $(SHADER)
+SRC := src/main.cpp src/Model.cpp src/RootTask.cpp $(SHADER) src/DataUtils.cpp
 
 # Object files
 NINTEXUTILS_OBJ := $(NINTEXUTILS_SRC:.c=.o)

@@ -13,12 +13,25 @@
 
 class Model;
 
+enum MiiDataInputType {
+    INPUT_TYPE_FFL_MIIDATACORE = 0,
+    INPUT_TYPE_RFL_CHARDATA,
+    INPUT_TYPE_NX_CHARINFO,
+    INPUT_TYPE_STUDIO_ENCODED,
+    INPUT_TYPE_STUDIO_RAW,
+    INPUT_TYPE_NX_COREDATA,
+    INPUT_TYPE_NX_STOREDATA,
+    INPUT_TYPE_RFL_CHARDATA_LE
+};
+
 struct RenderRequest {
     //FFLStoreData    storeData;
     char            data[96];   // just a buffer that accounts for maximum size
+    unsigned int    dataLength; // determines the mii data format
     unsigned int    resolution; // resolution for render buffer
     // NOTE: texture resolution can control whether mipmap is enabled (1 << 30)
     FFLResolution   texResolution; // u32, or just uint, i think
+    //unsigned int    scaleFactor;
     bool            isHeadOnly;
     FFLExpression   expressionFlag; // also just uint
     FFLResourceType resourceType;

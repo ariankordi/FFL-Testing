@@ -18,6 +18,7 @@ def main():
 
     #resolution = 1600
     tex_resolution = 768
+    data_length = len(fflstoredata)
     is_head_only = False
     expression_flag = 1
     resource_type = 1
@@ -26,9 +27,9 @@ def main():
     # Crafting the struct
     # struct format: 'I?' means a 4-byte unsigned int and a 1-byte bool
     # Adjust the format string according to your needs
-    struct_format = '96sII?II4f'
+    struct_format = '96sIII?II4f'
     background_color_vec4 = [component / 255.0 for component in background_color]
-    packed_data = struct.pack(struct_format, fflstoredata, resolution, tex_resolution, is_head_only, expression_flag, resource_type, background_color_vec4[0], background_color_vec4[1], background_color_vec4[2], background_color_vec4[3])
+    packed_data = struct.pack(struct_format, fflstoredata, data_length, resolution, tex_resolution, is_head_only, expression_flag, resource_type, background_color_vec4[0], background_color_vec4[1], background_color_vec4[2], background_color_vec4[3])
 
     # Write the packed data to the output file
     with open(output_file, 'wb') as file:

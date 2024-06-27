@@ -28,6 +28,7 @@ FFL_RESOLUTION_MIP_MAP_ENABLE_MASK = 1 << 30
 class RenderRequest:
     def __init__(self, data, resolution=1024, tex_resolution=1024, is_head_only=False, expression_flag=1, resource_type=1, mipmap_enable=False, background_color=(0, 0, 0, 0)):
         self.data = bytes(data)
+        self.data_length = len(data)
         self.resolution = resolution
         actual_tex_resolution = tex_resolution & FFL_RESOLUTION_MASK
         mipmap_tex_resolution = tex_resolution + FFL_RESOLUTION_MIP_MAP_ENABLE_MASK
@@ -40,10 +41,11 @@ class RenderRequest:
 
     def pack(self):
         return struct.pack(
-            '96sII?II4f',
+            '96sIII?II4f',
             # todo this may need restructuring
             # bc it does not make much sense
             self.data,
+            self.data_length,
             self.resolution,
             self.tex_resolution,
             self.is_head_only,

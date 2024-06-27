@@ -326,6 +326,11 @@ void RootTask::createModel_() {
     mCounter = 0.0f;
 }
 
+#include <mii_ext_MiiPort.h>
+
+void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src);
+void convertStudioToCharInfoNX(charInfo *dest, const charInfoStudio *src);
+
 void RootTask::createModel_(RenderRequest *buf) {
     FFLCharModelSource modelSource;
     //FFLStoreData storeData; // to be used in case you provide it
@@ -334,78 +339,154 @@ void RootTask::createModel_(RenderRequest *buf) {
     /*modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
     modelSource.pBuffer = &buf->storeData;
 */
-    FFLiCharInfo charInfo;
+    FFLiCharInfo fCharInfo;
     // this will either be our blank new charInfo
     // ... or it will be redefined to the received buffer
-    FFLiCharInfo* pCharInfo = &charInfo;
+    FFLiCharInfo* pCharInfo = &fCharInfo;
 
-    if (buf->data[0] != 0x03)
-    {
-        // it is NOT FFLiMiiDataCore, it may be RFL tho
+    MiiDataInputType inputType;
 
-        // cast to FFLiMiIDataCoreRFL to check create id
-        FFLiMiiDataCoreRFL& charDataRFL = reinterpret_cast<FFLiMiiDataCoreRFL&>(buf->data);
-        // look at create id to run FFLiIsNTRMiiID
-        // NOTE: FFLiMiiDataCoreRFL2CharInfo is SUPPOSED to check
-        // whether it is an NTR mii id or not and store
-        // the result as pCharInfo->birthPlatform = FFL_BIRTH_PLATFORM_NTR
-        // HOWEVER, it clears out the create ID and runs the compare anyway
-        // the create id is actually not the same size either
-
-
-        // TODO: NOT WORKING ATM
-        /*FFLCreateID* createIDRFL = reinterpret_cast<FFLCreateID*>(charDataRFL.m_CreatorID);
-
-        // test for if it is NTR data
-        bool isNTR = FFLiIsNTRMiiID(createIDRFL);
-        RIO_LOG("IS NTR??? %i\n", isNTR);
-*/
-        // NOTE: NFLCharData for DS can be little endian tho!!!!!!
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-        // swap endian for rfl
-        static const FFLiSwapEndianDesc SWAP_ENDIAN_DESC_RFL[] = {
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_Flag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 10 }, // m_Name
-            { FFLI_SWAP_ENDIAN_TYPE_U8,  1 },  // m_Height
-            { FFLI_SWAP_ENDIAN_TYPE_U8,  1 },  // m_Build
-            { FFLI_SWAP_ENDIAN_TYPE_U8,  4 },  // m_CreatorID
-            { FFLI_SWAP_ENDIAN_TYPE_U8,  4 },  // m_SystemID
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_FaceFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_HairFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 2 },  // m_EyebrowFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 2 },  // m_EyeFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_NoseFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_MouthFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_GlassFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_BeardFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_MoleFlag
-            { FFLI_SWAP_ENDIAN_TYPE_U16, 10 } // creator name
-        };
-        FFLiSwapEndianGroup(buf->data, SWAP_ENDIAN_DESC_RFL, sizeof(SWAP_ENDIAN_DESC_RFL) / sizeof(FFLiSwapEndianDesc));
-#endif
-        /*if (pCharInfo->birthPlatform != FFL_BIRTH_PLATFORM_NTR) {
-            // flip endian
-        }
-        isNTR = FFLiIsNTRMiiID(createIDRFL);
-        RIO_LOG("IS NTR (2)??? %i\n", isNTR);
+    switch(buf->dataLength) {
+        /*case sizeof(FFLStoreData):
+        case sizeof(FFLiMiiDataOfficial):
+        case sizeof(FFLiMiiDataCore):
+            inputType = INPUT_TYPE_FFL_MIIDATACORE;
+            break;
         */
-        // TODO: HANDLE BOTH BIG AND LITTLE ENDIAN RFL DATA
-        FFLiMiiDataCoreRFL2CharInfo(pCharInfo,
-            charDataRFL,
-            NULL, false
-            //reinterpret_cast<u16*>(&buf->data[0x36]), true // creator name
-            // name offset: https://github.com/SMGCommunity/Petari/blob/53fd4ff9db54cb1c91a96534dcae9f2c2ea426d1/libs/RVLFaceLib/include/RFLi_Types.h#L342
-        );
-    } else {
-        // TODO: SWAP ENDIAN ON WII U OR HANDLE BOTH KINDS
-        FFLiMiiDataCore2CharInfo(pCharInfo,
-            reinterpret_cast<const FFLiMiiDataCore&>(buf->data),
-        // const u16* pCreatorName, bool resetBirthday
-        NULL, false);
+        case 76: // RFLStoreData
+        case 74: // RFLCharData
+            inputType = INPUT_TYPE_RFL_CHARDATA;
+            break;
+        case sizeof(charInfo): // nx char info
+            inputType = INPUT_TYPE_NX_CHARINFO;
+            break;
+        // todo nx storedata and coredata
+        case sizeof(charInfoStudio): // studio raw
+            inputType = INPUT_TYPE_STUDIO_RAW;
+            break;
+        case 47: // have also seen studio encoded come out like this
+        case 48: // studio encoded i think
+            inputType = INPUT_TYPE_STUDIO_ENCODED;
+            break;
+        default:
+            inputType = INPUT_TYPE_FFL_MIIDATACORE;
     }
 
-    modelSource.dataSource = FFL_DATA_SOURCE_BUFFER; // i.e. CharInfo
+    switch(inputType) {
+        case INPUT_TYPE_RFL_CHARDATA:
+        {
+            // it is NOT FFLiMiiDataCore, it may be RFL tho
+            // cast to FFLiMiIDataCoreRFL to check create id
+            FFLiMiiDataCoreRFL& charDataRFL = reinterpret_cast<FFLiMiiDataCoreRFL&>(buf->data);
+            // look at create id to run FFLiIsNTRMiiID
+            // NOTE: FFLiMiiDataCoreRFL2CharInfo is SUPPOSED to check
+            // whether it is an NTR mii id or not and store
+            // the result as pCharInfo->birthPlatform = FFL_BIRTH_PLATFORM_NTR
+            // HOWEVER, it clears out the create ID and runs the compare anyway
+            // the create id is actually not the same size either
+
+
+            // TODO: NOT WORKING ATM
+            /*FFLCreateID* createIDRFL = reinterpret_cast<FFLCreateID*>(charDataRFL.m_CreatorID);
+
+            // test for if it is NTR data
+            bool isNTR = FFLiIsNTRMiiID(createIDRFL);
+            RIO_LOG("IS NTR??? %i\n", isNTR);
+    */
+            // NOTE: NFLCharData for DS can be little endian tho!!!!!!
+#if __BYTE_ORDER__ != __ORDER_BIG_ENDIAN__
+            // swap endian for rfl
+            static const FFLiSwapEndianDesc SWAP_ENDIAN_DESC_RFL[] = {
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_Flag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 10 }, // m_Name
+                { FFLI_SWAP_ENDIAN_TYPE_U8,  1 },  // m_Height
+                { FFLI_SWAP_ENDIAN_TYPE_U8,  1 },  // m_Build
+                { FFLI_SWAP_ENDIAN_TYPE_U8,  4 },  // m_CreatorID
+                { FFLI_SWAP_ENDIAN_TYPE_U8,  4 },  // m_SystemID
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_FaceFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_HairFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 2 },  // m_EyebrowFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 2 },  // m_EyeFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_NoseFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_MouthFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_GlassFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_BeardFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 1 },  // m_MoleFlag
+                { FFLI_SWAP_ENDIAN_TYPE_U16, 10 } // creator name
+            };
+            FFLiSwapEndianGroup(buf->data, SWAP_ENDIAN_DESC_RFL, sizeof(SWAP_ENDIAN_DESC_RFL) / sizeof(FFLiSwapEndianDesc));
+#endif
+            /*if (pCharInfo->birthPlatform != FFL_BIRTH_PLATFORM_NTR) {
+                // flip endian
+            }
+            isNTR = FFLiIsNTRMiiID(createIDRFL);
+            RIO_LOG("IS NTR (2)??? %i\n", isNTR);
+            */
+            // TODO: HANDLE BOTH BIG AND LITTLE ENDIAN RFL DATA
+            FFLiMiiDataCoreRFL2CharInfo(pCharInfo,
+                charDataRFL,
+                NULL, false
+                //reinterpret_cast<u16*>(&buf->data[0x36]), true // creator name
+                // name offset: https://github.com/SMGCommunity/Petari/blob/53fd4ff9db54cb1c91a96534dcae9f2c2ea426d1/libs/RVLFaceLib/include/RFLi_Types.h#L342
+            );
+            break;
+        }
+        case INPUT_TYPE_STUDIO_ENCODED:
+        {
+            // The first byte is the random seed used in encoding
+            unsigned char random = buf->data[0];
+            unsigned char previous = random;
+
+            // Reverse the encoding process
+            // 48 = length of encoded mii
+            for (int i = 1; i < 48; i++) {
+                // Reverse the modulation and XOR to find the original byte
+                unsigned char encodedByte = buf->data[i];
+                unsigned char original = (encodedByte - 7 + 256) % 256; // reverse the addition of 7
+                original ^= previous; // reverse the XOR with the previous encoded byte
+                buf->data[i - 1] = original;
+                previous = encodedByte; // update previous to the current encoded byte for next iteration
+            }
+            charInfo charInfoNX;
+            convertStudioToCharInfoNX(&charInfoNX, reinterpret_cast<::charInfoStudio*>(buf->data));
+            convertCharInfoNXToFFLiCharInfo(pCharInfo, &charInfoNX);
+        }
+        // FALL THROUGH AND DECODE BUF AS RAW STUDIO DATA....
+        case INPUT_TYPE_STUDIO_RAW:
+            charInfo charInfoNX;
+            convertStudioToCharInfoNX(&charInfoNX, reinterpret_cast<::charInfoStudio*>(buf->data));
+            convertCharInfoNXToFFLiCharInfo(pCharInfo, &charInfoNX);
+            break;
+        case INPUT_TYPE_NX_CHARINFO:
+            convertCharInfoNXToFFLiCharInfo(pCharInfo, reinterpret_cast<::charInfo*>(buf->data));
+            break;
+        default:
+            // TODO: SWAP ENDIAN ON WII U OR HANDLE BOTH KINDS
+            FFLiMiiDataCore2CharInfo(pCharInfo,
+                reinterpret_cast<const FFLiMiiDataCore&>(buf->data),
+            // const u16* pCreatorName, bool resetBirthday
+            NULL, false);
+            break;
+    }
+
+    /*
+    // TODO: NEEDS MORE WORK!!!!!!!
+    // TODO TODO TODO THIS IS NOT RELIABLE AAAAAAAAAAA
+    // NOTE: rfl can begin with 00, 40, 80, 2a, 4a, c0...???
+    // NOTE: in MiiDataCore this is mii version, which should always be 3 or 4
+        // NOTE: according to mii_data_ver3.ksy it is 0 when made with mii maker camera....???????
+    // NOTE: on RFL this contains... padding0, sex, birthday, favorite color & favorite flag... yikes.
+    //if (buf->data[0] != 0x03 && buf->data[0] != 0x04)
+    {
+
+    } else {
+
+    }*/
+
+    /*modelSource.dataSource = FFL_DATA_SOURCE_BUFFER; // i.e. CharInfo
     modelSource.index = 0;
+    */
+    modelSource.dataSource = FFL_DATA_SOURCE_DIRECT_POINTER;
     modelSource.pBuffer = pCharInfo;
 
     // otherwise just fall through and use default
@@ -630,24 +711,19 @@ void RootTask::calc_()
 (GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D_MULTISAMPLE, msaaDepthBuffer, 0));
 */
 
-        // TODO: prolly wanna add background color to render params
-        /* look... can the consumer add it themselves with transparency?
-         * YEEES!!!!!!!!!!! THEY CAN!!!!!!!
-         * however, it's always faster to do things in the renderer.
-         * so may skippingas well just provide all of the options you can here.
-         * ... including, overlaying fake body image here , eventually.
-         */
         //const rio::Color4f clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
         renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, renderRequest->backgroundColor);
 
         // Bind the render buffer
         renderBuffer.bind();
+/*        RIO_GL_CALL(glViewport(0, 0, renderRequest->resolution, renderRequest->resolution));
 
         // Bind MSAA framebuffer
         /*RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, msaaFBO));
         RIO_GL_CALL(glViewport(0, 0, renderRequest->resolution, renderRequest->resolution));
 
-        // Clear the MSAA framebuffer
+        // Clear the buffer
+        RIO_GL_CALL(glClearColor(renderRequest->backgroundColor.r, renderRequest->backgroundColor.g, renderRequest->backgroundColor.b, renderRequest->backgroundColor.a));
         RIO_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 */
         RIO_LOG("Render buffer bound.\n");
@@ -655,32 +731,6 @@ void RootTask::calc_()
         // Render the first frame to the buffer
         mpModel->drawOpa(view_mtx, *projMtx);
         RIO_LOG("drawOpa rendered to the buffer.\n");
-
-/*
-// Create a normal (non-multisample) framebuffer for resolving MSAA
-GLuint resolveFBO, resolveColorBuffer;
-RIO_GL_CALL(glGenFramebuffers(1, &resolveFBO));
-RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, resolveFBO));
-
-// Create a color buffer for resolving MSAA
-RIO_GL_CALL(glGenTextures(1, &resolveColorBuffer));
-RIO_GL_CALL(glBindTexture(GL_TEXTURE_2D, resolveColorBuffer));
-RIO_GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, renderRequest->resolution, renderRequest->resolution, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr));
-RIO_GL_CALL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resolveColorBuffer, 0));
-
-// Resolve MSAA framebuffer to normal framebuffer
-RIO_GL_CALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, msaaFBO));
-RIO_GL_CALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFBO));
-RIO_GL_CALL(glBlitFramebuffer(0, 0, renderRequest->resolution, renderRequest->resolution, 0, 0, renderRequest->resolution, renderRequest->resolution, GL_COLOR_BUFFER_BIT, GL_LINEAR));
-
-// Bind the resolve framebuffer for reading
-RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, resolveFBO));
-*/
-
-
-
-
-
 
 // Render the body image
 //GLuint bodyTexture = loadRawRGBAImage();
@@ -707,14 +757,6 @@ if (!renderRequest->isHeadOnly)
         render_state.setBlendEnable(true);
         render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
 
-/*
-        render_state.setBlendEnable(true);
-        render_state.setBlendFactorSrcRGB(rio::Graphics::BLEND_MODE_ONE_MINUS_DST_ALPHA);
-        render_state.setBlekdFactorDstRGB(rio::Graphics::BLEND_MODE_DST_ALPHA);
-        render_state.setBlendFactorSrcAlpha(rio::Graphics::BLEND_MODE_ONE);
-        render_state.setBlendFactorDstAlpha(rio::Graphics::BLEND_MODE_ONE);
-        render_state.setBlendEquation(rio::Graphics::BLEND_FUNC_ADD);
-*/
         render_state.apply();
 
         rio::Shader shader;
@@ -803,6 +845,7 @@ if (!renderRequest->isHeadOnly)
         shader.unload();
         delete bodyTexture;
 }
+
         // draw xlu mask only after body is drawn
         // in case there are elements of the mask that go in the body region
         mpModel->drawXlu(view_mtx, *projMtx);
@@ -865,6 +908,7 @@ if (!renderRequest->isHeadOnly)
         RIO_GL_CALL(glDeleteFramebuffers(1, &resolveFBO));
         RIO_GL_CALL(glDeleteTextures(1, &resolveColorBuffer));
 */
+
         RIO_LOG("Render buffer unbound and GPU cache invalidated.\n");
 /*
         rio::Window::instance()->makeContextCurrent();

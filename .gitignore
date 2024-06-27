@@ -16,7 +16,7 @@
 *.dll
 
 # Fortran module files
-*.mod
+#*.mod  # mfs who added this really f*cking hate go.mod
 *.smod
 
 # Compiled Static libraries
@@ -56,3 +56,7 @@ FFLRes*.dat
 # misc
 *swp
 .DS_Store
+
+# should be temporary
+nwf body png/*raw
+test/*

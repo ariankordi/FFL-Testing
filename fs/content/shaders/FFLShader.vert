@@ -1,19 +1,19 @@
-#version 410
+#version 330 core
 
 uniform mat3 u_it;
 uniform mat4 u_mv;
 uniform mat4 u_proj;
 
-layout(location = 0) out vec4 PARAM_0;
-layout(location = 1) out vec4 PARAM_1;
-layout(location = 2) out vec4 PARAM_2;
-layout(location = 3) out vec4 PARAM_3;
-layout(location = 4) out vec4 PARAM_4;
-layout(location = 0) in vec4 a_color;
-layout(location = 1) in vec3 a_normal;
-layout(location = 2) in vec4 a_position;
-layout(location = 3) in vec3 a_tangent;
-layout(location = 4) in vec2 a_texCoord;
+out vec4 PARAM_0;
+out vec4 PARAM_1;
+out vec4 PARAM_2;
+out vec4 PARAM_3;
+out vec4 PARAM_4;
+in vec4 a_color;
+in vec3 a_normal;
+in vec4 a_position;
+in vec3 a_tangent;
+in vec2 a_texCoord;
 int stackIdxVar;
 int stateVar;
 vec4 RVar[128];

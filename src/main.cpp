@@ -7,7 +7,9 @@ static const rio::InitializeArg cInitializeArg = {
         .width = 800,
         .height = 800,
 #if RIO_IS_WIN
-        .resizable = false
+        .resizable = false,
+        .gl_major = 3,
+        .gl_minor = 3
 #endif // RIO_IS_WIN
     }
 };

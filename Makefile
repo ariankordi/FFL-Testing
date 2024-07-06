@@ -8,10 +8,9 @@ INCLUDES := -IninTexUtils/include -Irio/include -Iffl/include -Iinclude $(INCLUD
 
 # MLC path is where it expects "sys" and "usr" to be,
 # , where it can open the database and resource files
-# NDEBUG is required to build on 64 bit (ignore static asserts)
 # FFL_NO_OPEN_DATABASE makes sure it doesn't try to open the database by default if you don't need it
 # FFL_TEST_DISABLE_MII_COLOR_VERIFY is a testing option that allows you to use out of bound color values in CharInfo
-DEFS := -DFFL_MLC_PATH="\"./\"" -DRIO_DEBUG -DNDEBUG -DFFL_NO_OPEN_DATABASE -DFFL_TEST_DISABLE_MII_COLOR_VERIFY $(DEFS)
+DEFS := -DFFL_MLC_PATH="\"./\"" -DRIO_DEBUG -DFFL_NO_OPEN_DATABASE -DFFL_TEST_DISABLE_MII_COLOR_VERIFY $(DEFS)
 
 # Binary name which you can change if you want
 EXEC := ffl_testing_2_debug64

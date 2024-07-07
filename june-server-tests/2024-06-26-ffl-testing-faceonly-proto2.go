@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	// ApproxBiLinear for CPU SSAA
+	"golang.org/x/image/draw"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -48,6 +50,11 @@ type RenderRequest struct {
 	BackgroundColor [4]float32
 }
 
+func sayHello(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	fmt.Fprintln(w, "you are probably looking for /render.png")
+}
+
 func main() {
 	// Command-line arguments
 	host := flag.String("host", "0.0.0.0", "Host for the web server")
@@ -69,12 +76,15 @@ func main() {
 
 	upstreamTCP = *upstreamAddr
 
+	http.HandleFunc("/", sayHello)
 	http.HandleFunc("/render.png", renderImage)
 
 	address := fmt.Sprintf("%s:%d", *host, *port)
 	fmt.Printf("Starting server at %s\n", address)
 	log.Fatal(http.ListenAndServe(address, logRequest(http.DefaultServeMux)))
 }
+
+// BEGIN ACCESS LOG SECTION
 
 const (
 	// ANSI color codes for access logs
@@ -261,6 +271,76 @@ func colorQueryParameters(query string) string {
 	return strings.Join(coloredParams, "&")
 }
 
+// END ACCESS LOG SECTION
+
+// fetchDataFromDB fetches the data from the database for a given NNID
+func fetchDataFromDB(nnid string) ([]byte, error) {
+	normalizedNnid := normalizeNnid(nnid)
+	query := "SELECT data FROM nnid_to_mii_data_map WHERE normalized_nnid = ? LIMIT 1"
+	var data []byte
+	err := db.QueryRow(query, normalizedNnid).Scan(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// normalizeNnid normalizes the NNID by converting to lowercase and removing special characters
+func normalizeNnid(nnid string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(nnid, "-", ""), "_", ""), ".", ""))
+}
+
+// isBase64 checks if a string is a valid base64 encoded string
+func isBase64(s string) bool {
+	if len(s)%4 != 0 {
+		return false
+	}
+	_, err := base64.StdEncoding.DecodeString(s)
+	return err == nil
+}
+
+// isHex checks if a string is a valid hexadecimal encoded string
+func isHex(s string) bool {
+	_, err := hex.DecodeString(s)
+	return err == nil
+}
+
+// sendRenderRequest sends the render request to the render server and receives the buffer data
+func sendRenderRequest(request RenderRequest) ([]byte, error) {
+	var buffer bytes.Buffer
+	// Writing the struct to the buffer
+	err := binary.Write(&buffer, binary.LittleEndian, request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Connecting to the render server
+	conn, err := net.Dial("tcp", upstreamTCP)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	// Sending the request
+	_, err = conn.Write(buffer.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculating the expected buffer size
+	bufferSize := request.Resolution * request.Resolution * 4
+	receivedData := make([]byte, bufferSize)
+	_, err = io.ReadFull(conn, receivedData)
+	if err != nil {
+		return nil, err
+	}
+
+	return receivedData, nil
+}
+
+// ssaaFactor controls the resolution and scale multiplier.
+//const ssaaFactor = 2
+
 // renderImage handles the /render.png endpoint
 func renderImage(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -272,11 +352,19 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	expressionStr := query.Get("expression")
 	widthStr := query.Get("width")
 	if widthStr == "" {
-		widthStr = "1024"
+		widthStr = "270" // default width
 	}
+	ssaaFactorStr := query.Get("scale")
+	if ssaaFactorStr == "" {
+		ssaaFactorStr = "2" // default scale is 2x
+	}
+	// overrideTexResolution is set if the user specified texResolution
+	overrideTexResolution := false
 	texResolutionStr := query.Get("texResolution")
 	if texResolutionStr == "" {
 		texResolutionStr = widthStr
+	} else {
+		overrideTexResolution = true
 	}
 	nnid := query.Get("nnid")
 	resourceTypeStr := query.Get("resourceTypeFFL")
@@ -292,8 +380,12 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	// Checking for required data
+	/*if widthStr == "" {
+		http.Error(w, "specify a width", http.StatusBadRequest)
+		return
+	}*/
 	if data == "" && nnid == "" {
-		http.Error(w, "specify data as FFLStoreData in Base64, or nnid as an nnid", http.StatusBadRequest)
+		http.Error(w, "specify data as FFLStoreData/mii studio data in hex/base64, or nnid as an nnid, also specify \"width\" as the resolution", http.StatusBadRequest)
 		return
 	}
 
@@ -373,6 +465,10 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "texResolution is not a number", http.StatusBadRequest)
 		return
 	}
+	if texResolution > 8192 {
+		http.Error(w, "you cannot make texture resolution this high it will make your balls explode", http.StatusBadRequest)
+		return
+	}
 
 	// Parsing and validating resource type
 	resourceType, err := strconv.Atoi(resourceTypeStr)
@@ -381,12 +477,31 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ssaaFactor, err := strconv.Atoi(ssaaFactorStr)
+	if err != nil || ssaaFactor > 2 {
+		http.Error(w, "scale must be a number less than 2", http.StatusBadRequest)
+		return
+	}
+
+	// Strip mipmap bit from texResolution
+	texResolution &= FFLResolutionMask
+	// Also multiply it by two if it's particularly low...
+	if width < 256 && !overrideTexResolution {
+		texResolution *= 2
+	}
+	// Apply ssaaFactor to width
+	width *= ssaaFactor
+	// Also apply it to texResolution
+	if !overrideTexResolution {
+		texResolution *= ssaaFactor
+	}
+
 	// Creating the render request
 	renderRequest := RenderRequest{
 		Data:            [96]byte{},
 		DataLength:      uint32(len(storeData)),
 		Resolution:      uint32(width),
-		TexResolution:   uint32(texResolution & FFLResolutionMask),
+		TexResolution:   uint32(texResolution),
 		IsHeadOnly:      isHeadOnly,
 		ExpressionFlag:  uint32(expressionFlag),
 		ResourceType:    uint32(resourceType),
@@ -444,74 +559,20 @@ now, PickupCharInfo calls:
 		Rect:   image.Rect(0, 0, width, width),
 	}
 
+	if ssaaFactor != 1 {
+		// Scale down image by the ssaaFactor
+		width /= ssaaFactor
+		scaledImg := image.NewNRGBA(image.Rect(0, 0, width, width))
+		// Use draw.ApproxBiLinear method
+		// TODO: try better scaling but this is already pretty fast
+		draw.ApproxBiLinear.Scale(scaledImg, scaledImg.Bounds(), img, img.Bounds(), draw.Over, nil)
+		// replace the image with the scaled version
+		img = scaledImg
+	}
+
 	// Sending the image as a PNG response
 	w.Header().Set("Content-Type", "image/png")
 	png.Encode(w, img)
-}
-
-// fetchDataFromDB fetches the data from the database for a given NNID
-func fetchDataFromDB(nnid string) ([]byte, error) {
-	normalizedNnid := normalizeNnid(nnid)
-	query := "SELECT data FROM nnid_to_mii_data_map WHERE normalized_nnid = ? LIMIT 1"
-	var data []byte
-	err := db.QueryRow(query, normalizedNnid).Scan(&data)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-// normalizeNnid normalizes the NNID by converting to lowercase and removing special characters
-func normalizeNnid(nnid string) string {
-	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(nnid, "-", ""), "_", ""), ".", ""))
-}
-
-// isBase64 checks if a string is a valid base64 encoded string
-func isBase64(s string) bool {
-	if len(s)%4 != 0 {
-		return false
-	}
-	_, err := base64.StdEncoding.DecodeString(s)
-	return err == nil
-}
-
-// isHex checks if a string is a valid hexadecimal encoded string
-func isHex(s string) bool {
-	_, err := hex.DecodeString(s)
-	return err == nil
-}
-
-// sendRenderRequest sends the render request to the render server and receives the buffer data
-func sendRenderRequest(request RenderRequest) ([]byte, error) {
-	var buffer bytes.Buffer
-	// Writing the struct to the buffer
-	err := binary.Write(&buffer, binary.LittleEndian, request)
-	if err != nil {
-		return nil, err
-	}
-
-	// Connecting to the render server
-	conn, err := net.Dial("tcp", upstreamTCP)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
-	// Sending the request
-	_, err = conn.Write(buffer.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	// Calculating the expected buffer size
-	bufferSize := request.Resolution * request.Resolution * 4
-	receivedData := make([]byte, bufferSize)
-	_, err = io.ReadFull(conn, receivedData)
-	if err != nil {
-		return nil, err
-	}
-
-	return receivedData, nil
 }
 
 // Expression constants
@@ -596,3 +657,4 @@ func getExpressionFlag(input string) int {
 	}
 	return FFL_EXPRESSION_FLAG_NORMAL
 }
+

@@ -666,12 +666,17 @@ void RootTask::calc_()
             mCamera.at() = { 0.0f, 37.05f, 0.0f };
             mCamera.setUp({ 0.0f, 1.0f, 0.0f });
             mCamera.getMatrix(&view_mtx);
+
+            //view_mtx.m[0][0] *= -1; // Flip the x-axis
+            //view_mtx.m[1][0] *= -1; // Flip the y-axis
+            //view_mtx.m[1][1] *= -1; // Flip the y-axis
+
         }
 
         // Create the render buffer with the desired size
         rio::RenderBuffer renderBuffer;
         //renderBuffer.setSize(renderRequest->resolution * 2, renderRequest->resolution * 2);
-        int ssaaFactor = 2;  // Super Sampling factor, e.g., 2 for 2x SSAA
+        int ssaaFactor = 1;  // Super Sampling factor, e.g., 2 for 2x SSAA
         int width = renderRequest->resolution * ssaaFactor;
         int height = renderRequest->resolution * ssaaFactor;
 
@@ -755,6 +760,7 @@ if (!renderRequest->isHeadOnly)
         render_state.setDepthWriteEnable(false);
         render_state.setBlendEnable(true);
         render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
+        render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_DST_ALPHA);
 
         render_state.apply();
 
@@ -799,17 +805,25 @@ if (!renderRequest->isHeadOnly)
 
         // Render a full-screen quad to blend the head and body
         GLuint vao, vbo;
+#ifdef RIO_NO_CLIP_CONTROL
         float quadVertices[] = {
-            // Positions    // TexCoords
+            -1.0f, -1.0f,  0.0f, 1.0f,  // bottom-left corner
+            -1.0f,  1.0f,  0.0f, 0.0f,  // top-left corner
+            1.0f,  1.0f,  1.0f, 0.0f,  // top-right corner
+            -1.0f, -1.0f,  0.0f, 1.0f,  // bottom-left corner
+            1.0f,  1.0f,  1.0f, 0.0f,  // top-right corner
+            1.0f, -1.0f,  1.0f, 1.0f   // bottom-right corner
+        };
+#else
+        float quadVertices[] = {
             -1.0f,  1.0f,  0.0f, 1.0f,
             -1.0f, -1.0f,  0.0f, 0.0f,
             1.0f, -1.0f,  1.0f, 0.0f,
-
             -1.0f,  1.0f,  0.0f, 1.0f,
             1.0f, -1.0f,  1.0f, 0.0f,
             1.0f,  1.0f,  1.0f, 1.0f
         };
-
+#endif
         // TODO: SHOULD BE REIMPLEMENTED WITH RIO!!!!
         // NOTE: REFER TO https://github.com/aboood40091/RIO-Tests/blob/master/04_2D-Texture/src/roottask.cpp#L45
         // NOTE: HEADERS FOR THAT REFER TO https://github.com/aboood40091/RIO-Tests/blob/master/04_2D-Texture/src/roottask.h
@@ -823,15 +837,16 @@ if (!renderRequest->isHeadOnly)
         RIO_GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, vbo));
         RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW));
         RIO_GL_CALL(glEnableVertexAttribArray(0));
-        // rio::VertexStream i think
         RIO_GL_CALL(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0));
         RIO_GL_CALL(glEnableVertexAttribArray(1));
         RIO_GL_CALL(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float))));
 
         RIO_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
-        //rio::Drawer::DrawArrays(rio::Drawer::PrimitiveMode::TRIANGLES, 0, 6);
 
         RIO_GL_CALL(glBindVertexArray(0));
+
+        // Unbind the framebuffer
+        RIO_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 
         // Clean up
         RIO_GL_CALL(glDeleteVertexArrays(1, &vao));
@@ -845,12 +860,14 @@ if (!renderRequest->isHeadOnly)
         delete bodyTexture;
 }
 
+renderBuffer.bind();
+
         // draw xlu mask only after body is drawn
         // in case there are elements of the mask that go in the body region
         mpModel->drawXlu(view_mtx, *projMtx);
         RIO_LOG("drawXlu rendered to the buffer.\n");
 
-
+/*
         rio::RenderBuffer renderBufferDownsample;
         renderBufferDownsample.setSize(renderRequest->resolution, renderRequest->resolution);
 
@@ -867,14 +884,19 @@ if (!renderRequest->isHeadOnly)
 
         rio::RenderState render_state;
         render_state.setBlendEnable(true);
-        //render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
-        /*render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE);
+        /*
+        render_state.setBlendFactorSrc(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_DST_ALPHA);
+        render_state.setBlendFactorDst(rio::Graphics::BlendFactor::BLEND_MODE_DST_ALPHA);
+        render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE);
         render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE);
-        */
+        *
+        render_state.setBlendFactorSrc(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
+        render_state.setBlendFactorDst(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
         render_state.setBlendFactorSrcAlpha(rio::Graphics::BlendFactor::BLEND_MODE_SRC_ALPHA);
-        //render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_CONSTANT_ALPHA);
-        render_state.apply();
+        render_state.setBlendFactorDstAlpha(rio::Graphics::BlendFactor::BLEND_MODE_ONE_MINUS_SRC_ALPHA);
 
+        render_state.apply();
+/*
         // Load and compile the downsampling shader
         rio::Shader downsampleShader;
         downsampleShader.load("downsample_shader");
@@ -887,6 +909,9 @@ highResSampler.tryBindFS(downsampleShader.getFragmentSamplerLocation("highResTex
 
 // Set shader uniforms if needed
 downsampleShader.setUniform(ssaaFactor, u32(-1), downsampleShader.getFragmentUniformLocation("ssaaFactor"));
+
+downsampleShader.setUniform(f32(renderRequest->resolution), f32(renderRequest->resolution), u32(-1), downsampleShader.getFragmentUniformLocation("resolution"));
+
 
 // Render a full-screen quad to apply the downsampling shader
 GLuint quadVAO, quadVBO;
@@ -921,7 +946,7 @@ RIO_GL_CALL(glDeleteVertexArrays(1, &quadVAO));
 RIO_GL_CALL(glDeleteBuffers(1, &quadVBO));
 
 downsampleShader.unload();
-
+*/
 
 
         // Read the rendered data into a buffer and save it to a file
@@ -954,8 +979,8 @@ downsampleShader.unload();
 
         RIO_GL_CALL(glReadPixels(0, 0, renderRequest->resolution, renderRequest->resolution, GL_RGBA, GL_UNSIGNED_BYTE, readBuffer));
 */
-        renderBufferDownsample.read(0, readBuffer, renderBufferDownsample.getSize().x, renderBufferDownsample.getSize().y, renderTextureDownsampleColor->getNativeTexture().surface.nativeFormat);
-        //renderBuffer.read(0, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
+        //renderBufferDownsample.read(0, readBuffer, renderBufferDownsample.getSize().x, renderBufferDownsample.getSize().y, renderTextureDownsampleColor->getNativeTexture().surface.nativeFormat);
+        renderBuffer.read(0, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
 
         RIO_LOG("Rendered data read successfully from the buffer.\n");
         send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);

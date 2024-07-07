@@ -8,13 +8,8 @@
 #include <nn/ffl/FFLiColor.h>
 
 // NOTE: TAKEN FROM MiiPort/include/convert_mii.h
-// only conversion tables we need from MiiPort
+// only conversion table we need from MiiPort
 const u8 ToVer3GlassTypeTable[20] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 1, 3, 7, 7, 6, 7, 8, 7, 7};
-
-const u8 Ver3MouthColorTable[5] = {19, 20, 21, 22, 23};
-// shortened to 24 values
-const u8 ToVer3MouthColorTable[24] = {4, 4, 4, 4, 4, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4, 1, 4, 4, 4, 0, 1, 2, 3, 4};
-
 
 void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     // Initialize the destination structure
@@ -46,19 +41,7 @@ void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     dest->parts.noseScale = src->nose_scale;
     dest->parts.nosePositionY = src->nose_y;
     dest->parts.mouthType = src->mouth_type;
-    // NOTE ON MOUTH COLOR: we DO NOT KNOW UPPER LIP COLOR...
-    // SO if the mouth color is a ver3 mouth color then map it
-    // is the mouth color in the mouth color table??
-    bool mouthColorInVer3Table = false;
-    for (int i = 0; i < sizeof(Ver3MouthColorTable); ++i) {
-        if(Ver3MouthColorTable[i] == src->mouth_color) {
-            mouthColorInVer3Table = true;
-        }
-    }
-    if (mouthColorInVer3Table)
-        dest->parts.mouthColor = ToVer3MouthColorTable[src->mouth_color];
-    else
-        dest->parts.mouthColor = markCommonColor(src->mouth_color);
+    dest->parts.mouthColor = markCommonColor(src->mouth_color);
     dest->parts.mouthScale = src->mouth_scale;
     dest->parts.mouthScaleY = src->mouth_aspect;
     dest->parts.mouthPositionY = src->mouth_y;

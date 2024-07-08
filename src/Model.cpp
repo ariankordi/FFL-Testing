@@ -5,8 +5,6 @@
 #include <gpu/rio_RenderState.h>
 #include <math/rio_Matrix.h>
 
-const bool cLightEnable = true;
-
 Model::Model()
     : mCharModelDesc()
     , mMtxRT(rio::Matrix34f::ident)
@@ -14,6 +12,7 @@ Model::Model()
     , mMtxSRT(rio::Matrix34f::ident)
     , mpShader(nullptr)
     , mIsEnableSpecialDraw(false)
+    , mLightEnable(true)
     , mIsInitialized(false)
 {
     mpCharModel = new FFLCharModel();
@@ -77,7 +76,7 @@ void Model::drawXlu(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj
 void Model::setViewUniform_(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx)
 {
     RIO_ASSERT(mpShader);
-    mpShader->bind(cLightEnable);
+    mpShader->bind(mLightEnable);
     mpShader->setViewUniform(model_mtx, view_mtx, proj_mtx);
 }
 

@@ -1,3 +1,4 @@
+#include "nn/ffl/detail/FFLiCharInfo.h"
 #include <Model.h>
 #include <RootTask.h>
 
@@ -343,7 +344,7 @@ void RootTask::createModel_(RenderRequest *buf) {
 
     MiiDataInputType inputType;
 
-    switch(buf->dataLength) {
+    switch (buf->dataLength) {
         /*case sizeof(FFLStoreData):
         case sizeof(FFLiMiiDataOfficial):
         case sizeof(FFLiMiiDataCore):
@@ -369,7 +370,7 @@ void RootTask::createModel_(RenderRequest *buf) {
             inputType = INPUT_TYPE_FFL_MIIDATACORE;
     }
 
-    switch(inputType) {
+    switch (inputType) {
         case INPUT_TYPE_RFL_CHARDATA:
         {
             // it is NOT FFLiMiiDataCore, it may be RFL tho
@@ -479,6 +480,22 @@ void RootTask::createModel_(RenderRequest *buf) {
     } else {
 
     }*/
+
+    // VERIFY CHARINFO
+    if (buf->verifyCharInfo
+        // TODO TODO: rn we are still relying on FFL_TEST_DISABLE_MII_COLOR_VERIFY, so OUT OF BOUNDS COLORS ARE NOT VERIFIED AAAAAAAAAAAAAAAAAA
+        // TODO: USE FFLiVerifyCharInfoWithReason AND RETURN ACTUAL REASON
+        // but I think I want to separate making the model
+        // and picking up CharInfo from the request LATER
+        // and then apply it when I do that
+        && !FFLiVerifyCharInfo(pCharInfo, false) // no verify name
+    ) {
+        // CHARINFO IS INVALID, FAIL!
+        RIO_LOG("FFLiVerifyCharInfo failed, setting mpModel to nullptr here...\n");
+        mpModel = nullptr;
+        mCounter = 0.0f;
+        return;
+    }
 
     /*modelSource.dataSource = FFL_DATA_SOURCE_BUFFER; // i.e. CharInfo
     modelSource.index = 0;
@@ -672,6 +689,8 @@ void RootTask::calc_()
             //view_mtx.m[1][1] *= -1; // Flip the y-axis
 
         }
+
+        mpModel->setLightEnable(renderRequest->lightEnable);
 
         // Create the render buffer with the desired size
         rio::RenderBuffer renderBuffer;

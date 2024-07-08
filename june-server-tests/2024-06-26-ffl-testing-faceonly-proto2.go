@@ -21,6 +21,10 @@ import (
 	// ApproxBiLinear for CPU SSAA
 	"golang.org/x/image/draw"
 
+	"image/color"
+	"errors"
+	"syscall"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -39,15 +43,19 @@ const (
 // RenderRequest is the equivalent struct in Go for handling the render request data.
 // Added padding bytes to ensure compliance with the original C++ struct.
 type RenderRequest struct {
-	Data            [96]byte
-	DataLength      uint32
-	Resolution      uint32
-	TexResolution   uint32
-	IsHeadOnly      bool
-	Padding         [3]byte // Padding bytes to align with C++ struct
-	ExpressionFlag  uint32
-	ResourceType    uint32
-	BackgroundColor [4]float32
+	Data              [96]byte
+	DataLength        uint32
+	Resolution        uint32
+	TexResolution     uint32
+	IsHeadOnly        bool
+	VerifyCharInfo    bool
+	LightEnable       bool
+	//SetLightDirection bool
+	//LightDirection    [3]float32
+	_                 [1]byte // padding
+	ExpressionFlag    uint32
+	ResourceType      uint32
+	BackgroundColor   [4]float32
 }
 
 func sayHello(w http.ResponseWriter, r *http.Request) {
@@ -345,9 +353,9 @@ func sendRenderRequest(request RenderRequest) ([]byte, error) {
 func renderImage(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	data := query.Get("data")
-	type_ := query.Get("type")
-	if type_ == "" {
-		type_ = "face"
+	typeStr := query.Get("type")
+	if typeStr == "" {
+		typeStr = "face"
 	}
 	expressionStr := query.Get("expression")
 	widthStr := query.Get("width")
@@ -367,13 +375,14 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		overrideTexResolution = true
 	}
 	nnid := query.Get("nnid")
+	// inform them that pnid is not here yet
+	if query.Get("pnid") != "" || query.Get("api_id") == "1" {
+		http.Error(w, "no support for pretendo yet sorry, try this: https://mii-unsecure.ariankordi.net/mii_data/PN_Jon?api_id=1", http.StatusNotImplemented)
+		return
+	}
 	resourceTypeStr := query.Get("resourceTypeFFL")
 	if resourceTypeStr == "" {
 		resourceTypeStr = "1"
-	}
-	mipmapEnableStr := query.Get("mipmapEnable")
-	if mipmapEnableStr == "" {
-		mipmapEnableStr = "0"
 	}
 
 	var storeData []byte
@@ -396,11 +405,11 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		storeData, err = fetchDataFromDB(nnid)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			http.Error(w, fmt.Sprintf("Failed to fetch data from database: %v", err), http.StatusInternalServerError)
 			return
 		}
-		if storeData == nil {
+		if err == sql.ErrNoRows || storeData == nil {
 			http.Error(w, "did not find that nnid bro", http.StatusNotFound)
 			return
 		}
@@ -433,9 +442,28 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// parse background color
+	var bgColor color.RGBA
+	// taken from nwf-mii-cemu-toy miiPostHandler
+	bgColorParam := query.Get("bgColor")
+	// only process bgColor if it  exists
+	if bgColorParam != "" {
+		// this function will panic if length is 0
+		bgColor, err = ParseHexColorFast(bgColorParam)
+		// ignore alpha zero error
+		if err != nil && err != errAlphaZero {
+			http.Error(w, "bgColor format is wrong: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Determining if only the head should be rendered
-	isHeadOnly := type_ == "face_only"
-	mipmapEnable := mipmapEnableStr == "1"
+	// NOTE: no all_body for now
+	isHeadOnly := typeStr == "face_only"
+	// NOTE: WHAT SHOULD BOOLS LOOK LIKE...???
+	mipmapEnable := query.Get("mipmapEnable") != "" // is present?
+	lightEnable := query.Get("lightEnable") != "0" // 0 = no lighting
+	verifyCharInfo := query.Get("verifyMii") == "0" // 0 = no verify
 
 	// Parsing and validating expression flag
 	/*expressionFlag, err := strconv.Atoi(expressionFlagStr)
@@ -455,7 +483,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if width > 4095 {
-		http.Error(w, "ok little n**a i set the limit to 4K", http.StatusBadRequest)
+		http.Error(w, "ok bro i set the limit to 4K", http.StatusBadRequest)
 		return
 	}
 
@@ -465,6 +493,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "texResolution is not a number", http.StatusBadRequest)
 		return
 	}
+	// NOTE: excessive high texture resolutions crash (assert fail) the renderer
 	if texResolution > 8192 {
 		http.Error(w, "you cannot make texture resolution this high it will make your balls explode", http.StatusBadRequest)
 		return
@@ -496,6 +525,9 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		texResolution *= ssaaFactor
 	}
 
+	// convert bgColor to floats
+	bgColor4f := [4]float32{float32(bgColor.R), float32(bgColor.G), float32(bgColor.B), float32(bgColor.A)}
+
 	// Creating the render request
 	renderRequest := RenderRequest{
 		Data:            [96]byte{},
@@ -503,9 +535,11 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		Resolution:      uint32(width),
 		TexResolution:   uint32(texResolution),
 		IsHeadOnly:      isHeadOnly,
+		VerifyCharInfo:  verifyCharInfo,
+		LightEnable:     lightEnable,
 		ExpressionFlag:  uint32(expressionFlag),
 		ResourceType:    uint32(resourceType),
-		BackgroundColor: [4]float32{0, 0, 0, 0},
+		BackgroundColor: bgColor4f,
 	}
 
 	// Enabling mipmap if specified
@@ -519,8 +553,23 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	// Sending the render request and receiving buffer data
 	bufferData, err := sendRenderRequest(renderRequest)
 	if err != nil {
+		/*
+		isIncompleteData := err.Error() == "EOF"
+		var opError *net.OpError
+		var syscallError *os.SyscallError
+		if errors.As(err, &opError) && errors.As(err, &syscallError) {
+			if syscallError.Err == syscall.ECONNRESET ||
+				// WSAECONNREFUSED on windows
+				syscallError.Err == syscall.Errno(10061) {
+					isIncompleteData = true
+				}
+		}
+		*/
 		// Handling incomplete data response
-		if err.Error() == "EOF" {
+		if err.Error() == "EOF" ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		// WSAECONNREFUSED on windows
+		errors.Is(err, syscall.Errno(10061)) {
 			http.Error(w, `incomplete data from backend :( render probably failed bc FFLInitCharModelCPUStep failed... probably because data is invalid
 <details>
 <summary>
@@ -548,7 +597,7 @@ now, PickupCharInfo calls:
 		`, http.StatusInternalServerError)
 			return
 		}
-		http.Error(w, fmt.Sprintf("Failed to send render request: %v", err), http.StatusBadGateway)
+		http.Error(w, "incomplete backend from backend, error is: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -658,3 +707,67 @@ func getExpressionFlag(input string) int {
 	return FFL_EXPRESSION_FLAG_NORMAL
 }
 
+
+// NOTE: BELOW IS IN nwf-mii-cemu-toy handlers.go
+
+// adapted from https://stackoverflow.com/a/54200713
+var errInvalidFormat = errors.New("invalid format")
+var errAlphaZero = errors.New("alpha component is zero")
+
+func ParseHexColorFast(s string) (c color.RGBA, err error) {
+	// initialize A to full opacity
+	c.A = 0xff
+
+	hexToByte := func(b byte) byte {
+		switch {
+		case b >= '0' && b <= '9':
+			return b - '0'
+		// NOTE: the official mii studio api DOES NOT accept lowercase
+		// ... however, this function is used for both studio format RGBA hex
+		// as well as traditional RGB hex so we will forgive it
+		case b >= 'a' && b <= 'f':
+			return b - 'a' + 10
+		case b >= 'A' && b <= 'F':
+			return b - 'A' + 10
+		}
+		err = errInvalidFormat
+		return 0
+	}
+
+	if s[0] == '#' {
+		switch len(s) {
+		case 7: // #RRGGBB
+			c.R = hexToByte(s[1])<<4 + hexToByte(s[2])
+			c.G = hexToByte(s[3])<<4 + hexToByte(s[4])
+			c.B = hexToByte(s[5])<<4 + hexToByte(s[6])
+		// TODO: is this format really necessary to have?
+		case 4: // #RGB
+			c.R = hexToByte(s[1]) * 17
+			c.G = hexToByte(s[2]) * 17
+			c.B = hexToByte(s[3]) * 17
+		default:
+			err = errInvalidFormat
+		}
+	} else {
+		// Assuming the string is 8 hex digits representing RGBA without '#'
+		if len(s) != 8 {
+			err = errInvalidFormat
+			return
+		}
+
+		// Parse RGBA
+		r := hexToByte(s[0])<<4 + hexToByte(s[1])
+		g := hexToByte(s[2])<<4 + hexToByte(s[3])
+		b := hexToByte(s[4])<<4 + hexToByte(s[5])
+		a := hexToByte(s[6])<<4 + hexToByte(s[7])
+
+		// Only set RGB if A > 0
+		c.R, c.G, c.B, c.A = r, g, b, a
+		if a > 0 {
+			// alpha is zero, meaning transparent
+			err = errAlphaZero
+		}
+	}
+
+	return
+}

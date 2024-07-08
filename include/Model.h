@@ -45,6 +45,11 @@ public:
         updateMtxSRT_();
     }
 
+    void setLightEnable(bool lightEnable)
+    {
+        mLightEnable = lightEnable;
+    }
+
     const rio::BaseVec3f& getScale() const
     {
         return mScale;
@@ -79,6 +84,7 @@ private:
     rio::BaseVec3f      mScale;
     rio::BaseMtx34f     mMtxSRT;
     const Shader*       mpShader;
+    bool                mLightEnable;
     bool                mIsEnableSpecialDraw;
     bool                mIsInitialized;
 };

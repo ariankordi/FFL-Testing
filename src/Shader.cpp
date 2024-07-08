@@ -207,6 +207,8 @@ const FFLColor cLightDiffuse  = { 0.60f, 0.60f, 0.60f, 1.0f };
 const FFLColor cLightSpecular = { 0.70f, 0.70f, 0.70f, 1.0f };
 
 const rio::BaseVec3f cLightDir = { -0.4531539381f, 0.4226179123f, 0.7848858833f };
+// nwf light direction but doesn't seem to differ much
+//const rio::BaseVec3f cLightDir = { -0.455f, 0.348f, 0.5f };
 
 const FFLColor cRimColor = { 0.3f, 0.3f, 0.3f, 1.0f };
 const f32 cRimPower = 2.0f;
@@ -440,6 +442,13 @@ void Shader::setModulateMode_(FFLModulateMode mode)
 void Shader::setModulate_(const FFLModulateParam& modulateParam)
 {
     setModulateMode_(modulateParam.mode);
+
+    // if you want to change colors based on modulateParam.type
+    // FFL_MODULATE_TYPE_SHAPE_HAIR
+    // hair color: pColorR/const1
+    // FFL_MODULATE_TYPE_EYEBROW
+    // eyebrow color: pColorB/const2
+    // NOTE, also need to color: FFL_MODULATE_TYPE_SHAPE_BEARD, FFL_MODULATE_TYPE_MUSTACHE, FFL_MODULATE_TYPE_FACE_BEARD
 
     switch (modulateParam.mode)
     {

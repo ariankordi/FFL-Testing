@@ -34,6 +34,11 @@ class RenderRequest:
         mipmap_tex_resolution = tex_resolution + FFL_RESOLUTION_MIP_MAP_ENABLE_MASK
         self.tex_resolution = mipmap_tex_resolution if mipmap_enable else actual_tex_resolution
         self.is_head_only = is_head_only
+        # NOTE: if you want to still use
+        # this script then uhhhhhhhhhh
+        # you can redefine these here
+        self.verify_charinfo = False
+        self.light_enable = True
         self.expression_flag = expression_flag
         self.resource_type = resource_type
         # encode bg color to vec4
@@ -41,7 +46,7 @@ class RenderRequest:
 
     def pack(self):
         return struct.pack(
-            '96sIII?II4f',
+            '96sIII???II4f',
             # todo this may need restructuring
             # bc it does not make much sense
             self.data,
@@ -49,6 +54,8 @@ class RenderRequest:
             self.resolution,
             self.tex_resolution,
             self.is_head_only,
+            self.verify_charinfo,
+            self.light_enable,
             self.expression_flag,
             self.resource_type,
             self.background_color[0], self.background_color[1], self.background_color[2], self.background_color[3]

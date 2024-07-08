@@ -1,3 +1,4 @@
+#include "nn/ffl/FFLBirthPlatform.h"
 #include <nn/ffl.h>
 
 #include <misc/rio_MemUtil.h>
@@ -71,10 +72,14 @@ void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     dest->height = src->height;
     dest->build = src->build;
     rio::MemUtil::copy(dest->name, src->nickname, sizeof(src->nickname));
-    dest->gender = (FFLGender)src->gender;
+    // NOTE: not sure if this is accurate
+    dest->gender = static_cast<FFLGender>((src->gender <= 1) ? src->gender : FFL_GENDER_MAX);
     dest->favoriteColor = src->favorite_color;
-    dest->favoriteMii = src->type;
+    // no equivalent for favoriteMii
     dest->regionMove = src->region_move;
+    // MiiPort: "The switch sets this to 4, but the 3DS rejects it if set to >3"
+    // ^ actually above they may be talking about the mii version I don't know
+    dest->birthPlatform = FFL_BIRTH_PLATFORM_CTR;
     //dest->fontRegion = src->font_region;
 }
 

@@ -387,7 +387,7 @@ void RootTask::calc_()
     if (mSocketIsListening &&
         (new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) > 0) {
         // Assuming data directly received is FFLStoreData
-        ssize_t read_bytes =
+        int read_bytes =
             //read(new_socket, &storeData, sizeof(FFLStoreData));
             // NOTE: this will store BOTH charinfo AND storedata so uh
             recv(new_socket, buf,

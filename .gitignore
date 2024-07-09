@@ -56,3 +56,9 @@ FFLRes*.dat
 # misc
 *swp
 .DS_Store
+
+# visual studio
+.vs
+FFL-Testing/
+*.pdb
+*.user

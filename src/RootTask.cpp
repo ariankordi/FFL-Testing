@@ -575,7 +575,7 @@ void RootTask::calc_()
     if (mSocketIsListening &&
         (new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) > 0) {
         // Assuming data directly received is FFLStoreData
-        ssize_t read_bytes =
+        int read_bytes =
             //read(new_socket, &storeData, sizeof(FFLStoreData));
             // NOTE: this will store BOTH charinfo AND storedata so uh
             recv(new_socket, buf,
@@ -683,12 +683,15 @@ void RootTask::calc_()
             mCamera.at() = { 0.0f, 37.05f, 0.0f };
             mCamera.setUp({ 0.0f, 1.0f, 0.0f });
             mCamera.getMatrix(&view_mtx);
-
-            //view_mtx.m[0][0] *= -1; // Flip the x-axis
-            //view_mtx.m[1][0] *= -1; // Flip the y-axis
-            //view_mtx.m[1][1] *= -1; // Flip the y-axis
-
         }
+
+        #ifdef RIO_NO_CLIP_CONTROL
+            // render upside down so glReadPixels is right side up
+            if (projMtx->m[1][1] > 0) // if it is not already negative
+                projMtx->m[1][1] *= -1.f; // Flip Y axis
+            // set front face culling from CCW to CW
+            RIO_GL_CALL(glFrontFace(GL_CW));
+        #endif
 
         mpModel->setLightEnable(renderRequest->lightEnable);
 
@@ -734,6 +737,7 @@ void RootTask::calc_()
 
 */
         //const rio::Color4f clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+        // NOTE: this calls glViewport
         renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, renderRequest->backgroundColor);
 
         // Bind the render buffer
@@ -1023,6 +1027,17 @@ downsampleShader.unload();
 */
 
         RIO_LOG("Render buffer unbound and GPU cache invalidated.\n");
+
+        if (!mServerOnly) {
+            rio::Window::instance()->makeContextCurrent();
+
+            u32 width = rio::Window::instance()->getWidth();
+            u32 height = rio::Window::instance()->getHeight();
+
+            rio::Graphics::setViewport(0, 0, width, height);
+            rio::Graphics::setScissor(0, 0, width, height);
+            RIO_LOG("Viewport and scissor reset to window dimensions: %dx%d\n", width, height);
+        }
 
         //firstFrame = false;
         {

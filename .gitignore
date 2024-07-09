@@ -60,3 +60,9 @@ FFLRes*.dat
 # should be temporary
 nwf body png/*raw
 test/*
+
+# visual studio
+.vs
+FFL-Testing/
+*.pdb
+*.user

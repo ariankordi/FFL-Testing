@@ -38,7 +38,7 @@ struct RenderRequest {
     bool            lightEnable;
     //bool            setLightDirection;
     //rio::BaseVec3f  lightDir;
-    FFLExpression   expressionFlag; // also just uint
+    unsigned int    expressionFlag;
     FFLResourceType resourceType;
     rio::Color4f    backgroundColor; // passed to clearcolor
 };

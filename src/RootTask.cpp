@@ -130,11 +130,10 @@ void RootTask::prepare_()
 
     mShader.initialize();
 
+    // Get window instance
+    const rio::Window* const window = rio::Window::instance();
     // Set projection matrix
     {
-        // Get window instance
-        const rio::Window* const window = rio::Window::instance();
-
         // Calculate the aspect ratio based on the window dimensions
         float aspect = f32(window->getWidth()) / f32(window->getHeight());
         // Calculate the field of view (fovy) based on the given parameters
@@ -250,6 +249,12 @@ void RootTask::prepare_()
     }
 
     #endif // RIO_IS_WIN (socket)
+
+    // Set window aspect ratio, so that when resizing it will not change
+    #ifdef RIO_IS_WIN
+        GLFWwindow* glfwWindow = rio::Window::instance()->getNativeWindow().getGLFWwindow();
+        glfwSetWindowAspectRatio(glfwWindow, window->getWidth(), window->getHeight());
+    #endif // RIO_IS_WIN
 
     mInitialized = true;
 }

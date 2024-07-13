@@ -10,7 +10,7 @@
         - Run `june-server-tests/2024-06-19-ffl-testing-faceonly-proto.py`
     * Go
         - Inside `june-server-tests` just `go run .` or run the Go file
-4. Make sure FFL-Testing is running and listening, and try a request like this to the server: http://localhost:5000/render.png?data=005057676b5258664e5364696a7477818e89969e9ea5b5bb9599a1b1a1a8dacdd3daddcdd0cad2d3e5e8ef060d1417&width=512
+4. Make sure FFL-Testing is running and listening, and try a request like this to the server: http://localhost:5000/miis/image.png?data=005057676b5258664e5364696a7477818e89969e9ea5b5bb9599a1b1a1a8dacdd3daddcdd0cad2d3e5e8ef060d1417&width=512
 5. If that works then run you probably want to run ffl_testing_2_debug64 with the `SERVER_ONLY` environment variable: `SERVER_ONLY=1 ./ffl_testing_2_debug64`
 6. Jon Pretendo if you are reading please return my 65 inch 4k ultra hd apple tv with dolby vision
     * seriously fix my account please I won't make a new nasc account with a malformed serial number again 😔 😔 😔 😔 😔 https://discord.com/channels/408718485913468928/1236115730869649489/1236115730869649489

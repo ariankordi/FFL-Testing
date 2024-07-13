@@ -60,7 +60,7 @@ type RenderRequest struct {
 
 func sayHello(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintln(w, "you are probably looking for /render.png")
+	fmt.Fprintln(w, "you are probably looking for /miis/image.png")
 }
 
 func main() {
@@ -85,7 +85,7 @@ func main() {
 	upstreamTCP = *upstreamAddr
 
 	http.HandleFunc("/", sayHello)
-	http.HandleFunc("/render.png", renderImage)
+	http.HandleFunc("/miis/image.png", renderImage)
 
 	address := fmt.Sprintf("%s:%d", *host, *port)
 	fmt.Printf("Starting server at %s\n", address)
@@ -463,7 +463,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	// NOTE: WHAT SHOULD BOOLS LOOK LIKE...???
 	mipmapEnable := query.Get("mipmapEnable") != "" // is present?
 	lightEnable := query.Get("lightEnable") != "0" // 0 = no lighting
-	verifyCharInfo := query.Get("verifyMii") == "0" // 0 = no verify
+	verifyCharInfo := query.Get("verifyCharInfo") != "0" // 0 = no verify
 
 	// Parsing and validating expression flag
 	/*expressionFlag, err := strconv.Atoi(expressionFlagStr)

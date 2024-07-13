@@ -593,7 +593,7 @@ void RootTask::calc_()
             hasSocketRequest = true;
             createModel_(reinterpret_cast<RenderRequest*>(buf));
         } else {
-            RIO_LOG("got a request of length %lu (should be %lu), dropping\n", read_bytes, RENDERREQUEST_SIZE);
+            RIO_LOG("got a request of length %d (should be %lu), dropping\n", read_bytes, RENDERREQUEST_SIZE);
             #ifdef _WIN32
                 closesocket(new_socket);
             #else
@@ -1034,6 +1034,12 @@ downsampleShader.unload();
         RIO_LOG("Render buffer unbound and GPU cache invalidated.\n");
 
         if (!mServerOnly) {
+            #ifdef RIO_NO_CLIP_CONTROL
+                // set back front face culling
+                RIO_GL_CALL(glFrontFace(GL_CCW));
+                if (projMtx->m[1][1] < 0) // if it is negative
+                    projMtx->m[1][1] *= -1.f; // Flip Y axis back
+            #endif
             rio::Window::instance()->makeContextCurrent();
 
             u32 width = rio::Window::instance()->getWidth();

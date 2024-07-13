@@ -140,7 +140,7 @@ def is_hex(s):
 
 #valid_sizes = [72, 74, 76, 92,]
 
-@app.route('/render.png', methods=['GET'])
+@app.route('/miis/image.png', methods=['GET'])
 def render_image():
     data = request.args.get('data')
     type_ = request.args.get('type', 'face')
@@ -270,5 +270,7 @@ if __name__ == "__main__":
     parser.add_argument('--host', type=str, default='0.0.0.0', help="Host for the web server")
     parser.add_argument('--port', type=int, default=5000, help="Port for the web server")
     args = parser.parse_args()
+
+    print('\033[1m---> remember that the renderer API is at \033[4m/miis/image.png\033[0m\033[1m <---\033[0m\n')
 
     app.run(host=args.host, port=args.port)

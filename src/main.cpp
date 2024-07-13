@@ -3,7 +3,7 @@
 #include <rio.h>
 #include <gfx/rio_Window.h>
 
-static const rio::InitializeArg cInitializeArg = {
+static rio::InitializeArg initializeArg = {
     .window = {
         .width = 600,
         .height = 600,
@@ -17,13 +17,16 @@ static const rio::InitializeArg cInitializeArg = {
 
 int main()
 {
-    // Initialize RIO with root task
-    if (!rio::Initialize<RootTask>(cInitializeArg))
+    char* isServerOnly = getenv("SERVER_ONLY");
+    // use invisible window with server only
+    if (isServerOnly)
+        initializeArg.window.invisible = true;
+
+    // Initialize RIO, make window...
+    if (!rio::Initialize<RootTask>(initializeArg))
         return -1;
 
-    char* isServerOnly = getenv("SERVER_ONLY");
-
-    // do not present to window when server only
+    // do not draw/present to window when server only
     // may avoid an issue where, when window hasn't been updated
     // for a while (which it won't be if SERVER_ONLY is enabled
     // , since the program blocks on accept() all day)...

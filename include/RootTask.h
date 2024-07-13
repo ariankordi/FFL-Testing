@@ -55,6 +55,8 @@ private:
     void calc_() override;
     void exit_() override;
 
+    void handleRenderRequest(char* buf, rio::BaseMtx34f view_mtx);
+
     void createModel_();
     //void createModel_(char (*buf)[FFLICHARINFO_SIZE]);
     void createModel_(RenderRequest *buf);

@@ -28,6 +28,7 @@ public:
     bool initialize(const InitArg<T>& arg, const Shader& shader);
 
     FFLCharModel* getCharModel() const { return mpCharModel; }
+    FFLResult getInitializeCpuResult() const { return mInitializeCpuResult; }
 
     void enableSpecialDraw();
 
@@ -87,6 +88,7 @@ private:
     bool                mLightEnable;
     bool                mIsEnableSpecialDraw;
     bool                mIsInitialized;
+    FFLResult           mInitializeCpuResult;
 };
 
 template <typename T>

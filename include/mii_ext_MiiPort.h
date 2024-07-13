@@ -227,5 +227,6 @@ typedef struct {
 } charInfoStudio;
 
 // DataUtils.cpp
-void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src);
-void convertStudioToCharInfoNX(charInfo *dest, const charInfoStudio *src);
+void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src);
+void studioToCharInfoNX(charInfo* dest, const charInfoStudio* src);
+void studioURLObfuscationDecode(char* data);

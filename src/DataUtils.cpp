@@ -12,7 +12,7 @@
 // only conversion table we need from MiiPort
 const u8 ToVer3GlassTypeTable[20] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 1, 3, 7, 7, 6, 7, 8, 7, 7};
 
-void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
+void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     // Initialize the destination structure
     rio::MemUtil::set(dest, 0, sizeof(FFLiCharInfo));
 
@@ -84,7 +84,7 @@ void convertCharInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
 }
 
 
-void convertStudioToCharInfoNX(charInfo *dest, const charInfoStudio *src) {
+void studioToCharInfoNX(charInfo* dest, const charInfoStudio* src) {
     // Initialize charInfo struct with zeros
     rio::MemUtil::set(dest, 0, sizeof(charInfo));
 
@@ -137,4 +137,21 @@ void convertStudioToCharInfoNX(charInfo *dest, const charInfoStudio *src) {
     dest->nose_y = src->nose_y;
 
     // Other fields of charInfo will remain zero-initialized.
+}
+
+void studioURLObfuscationDecode(char* data) {
+    // The first byte is the random seed used in encoding
+    unsigned char random = data[0];
+    unsigned char previous = random;
+
+    // Reverse the encoding process
+    // NOTE: 48 = length of encoded mii
+    for (int i = 1; i < 48; i++) {
+        // Reverse the modulation and XOR to find the original byte
+        unsigned char encodedByte = data[i];
+        unsigned char original = (encodedByte - 7 + 256) % 256; // reverse the addition of 7
+        original ^= previous; // reverse the XOR with the previous encoded byte
+        data[i - 1] = original;
+        previous = encodedByte; // update previous to the current encoded byte for next iteration
+    }
 }

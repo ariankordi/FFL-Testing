@@ -563,7 +563,8 @@ void Shader::draw_(const FFLDrawParam& draw_param)
                         // NOTE: CAN ALSO PROBABLY BE ADDED TO FFL ITSELF, I just don't know where to put it
                         if (draw_param.modulateParam.type == FFL_MODULATE_TYPE_SHAPE_MASK ||
                             draw_param.modulateParam.type == FFL_MODULATE_TYPE_FACE_MAKE ||
-                            draw_param.modulateParam.type == FFL_MODULATE_TYPE_FACE_LINE)
+                            draw_param.modulateParam.type == FFL_MODULATE_TYPE_FACE_LINE ||
+                            draw_param.modulateParam.type == FFL_MODULATE_TYPE_FACE_BEARD)
                         {
                             // Flip the texture coordinates within the buffer
                             u32 numTexCoords = size / sizeof(f32);

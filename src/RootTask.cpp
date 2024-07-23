@@ -1,3 +1,4 @@
+#include "gpu/rio_Texture.h"
 #include "nn/ffl/detail/FFLiCharInfo.h"
 #include <Model.h>
 #include <RootTask.h>
@@ -869,11 +870,8 @@ downsampleShader.unload();
 
 
     // Read the rendered data into a buffer and save it to a file
-    //std::vector<u8> pixelData(renderBuffer.getSize().x * renderBuffer.getSize().y * 4);
-    //int bufferSize = renderBuffer.getSize().x * renderBuffer.getSize().y * 4; // Assuming 4 bytes per pixel (RGBA)
-    int bufferSize = renderRequest->resolution * renderRequest->resolution * 4;
-    u8* readBuffer = new u8[bufferSize];
-    //rio::MemUtil::set(readBuffer, 0xFF, bufferSize);
+    int bufferSize = renderBuffer.getSize().x * renderBuffer.getSize().y * 4; // Assuming 4 bytes per pixel (RGBA)
+    //int bufferSize = renderRequest->resolution * renderRequest->resolution * 4;
 /*
     // Create a regular framebuffer to resolve the MSAA buffer to
     GLuint resolveFBO, resolveColorRBO;
@@ -899,12 +897,35 @@ downsampleShader.unload();
     RIO_GL_CALL(glReadPixels(0, 0, renderRequest->resolution, renderRequest->resolution, GL_RGBA, GL_UNSIGNED_BYTE, readBuffer));
 */
     //renderBufferDownsample.read(0, readBuffer, renderBufferDownsample.getSize().x, renderBufferDownsample.getSize().y, renderTextureDownsampleColor->getNativeTexture().surface.nativeFormat);
-    renderBuffer.read(0, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, renderTextureColor->getNativeTexture().surface.nativeFormat);
+    rio::NativeTextureFormat nativeFormat = renderTextureColor->getNativeTexture().surface.nativeFormat;
 
+#ifdef RIO_IS_WIN
+/*
+    glReadBuffer(GL_COLOR_ATTACHMENT0 + 0);
+    glReadPixels(0, 0, width, height, nativeFormat.format, nativeFormat.type, readBuffer);
+*/
+    // map a pixel buffer object (DMA?)
+    GLuint pbo;
+    RIO_GL_CALL(glGenBuffers(1, &pbo));
+    RIO_GL_CALL(glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo));
+    RIO_GL_CALL(glBufferData(GL_PIXEL_PACK_BUFFER, bufferSize, nullptr, GL_STREAM_READ));
+    RIO_GL_CALL(glReadPixels(0, 0, width, height, nativeFormat.format, nativeFormat.type, nullptr));
+    void* readBuffer = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+    // Process data in ptr
     RIO_LOG("Rendered data read successfully from the buffer.\n");
     send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
-
+    RIO_GL_CALL(glUnmapBuffer(GL_PIXEL_PACK_BUFFER));
+    RIO_GL_CALL(glBindBuffer(GL_PIXEL_PACK_BUFFER, 0));
+    RIO_GL_CALL(glDeleteBuffers(1, &pbo));
+// NOTE: renderBuffer.read() IS NOT IMPLEMENTED ON CAFE NOR IS THIS MEANT TO RUN ON WII U AT ALL LOL
+#else
+    u8* readBuffer = new u8[bufferSize];
+    //rio::MemUtil::set(readBuffer, 0xFF, bufferSize);
+    // NOTE: UNTESTED
+    renderBuffer.read(0, readBuffer, renderBuffer.getSize().x, renderBuffer.getSize().y, nativeFormat);
+    send(new_socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
     delete[] readBuffer;
+#endif
 
 
     // Unbind the render buffer

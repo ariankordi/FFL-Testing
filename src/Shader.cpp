@@ -568,13 +568,21 @@ void Shader::draw_(const FFLDrawParam& draw_param)
                             // Flip the texture coordinates within the buffer
                             u32 numTexCoords = size / sizeof(f32);
 
-                            // Process the data in-place
-                            for (u32 i = 0; i < numTexCoords; i += 2) {
-                                f32* texCoord = static_cast<f32*>(ptr) + i;
-                                texCoord[1] = 1.0f - texCoord[1]; // Flip Y coordinate in-place
+                            f32* flippedTexCoords = new f32[numTexCoords];
+
+                            for (u32 i = 0; i < numTexCoords; i += 2)
+                            {
+                                f32* originalTexCoord = static_cast<f32*>(ptr) + i;
+                                flippedTexCoords[i] = originalTexCoord[0];
+                                // flip Y coordinate
+                                flippedTexCoords[i + 1] = 1.0f - originalTexCoord[1];
                             }
 
-                            RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, ptr, GL_STATIC_DRAW));
+                            RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, size, flippedTexCoords, GL_STATIC_DRAW));
+
+                            // Don't forget to free the allocated memory
+                            delete[] flippedTexCoords;
+
                         }
                         else
                         {

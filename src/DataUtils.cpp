@@ -18,7 +18,9 @@ void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
 
     // Copy and convert values
     dest->parts.faceType = src->faceline_type;
-    dest->parts.facelineColor = markCommonColor(src->faceline_color);
+    // NOTE: ver3 common colors ARE compatible with switch table
+    // ASSUMES THAT YOUR FFL IS USING SWITCH FACELINE COLOR TABLE!!!!
+    dest->parts.facelineColor = src->faceline_color;
     dest->parts.faceLine = src->faceline_wrinkle;
     dest->parts.faceMakeup = src->faceline_make;
     dest->parts.hairType = src->hair_type;
@@ -52,12 +54,9 @@ void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     dest->parts.mustacheScale = src->mustache_scale;
     dest->parts.mustachePositionY = src->mustache_y;
 
-    /*dest->parts.glassType = src->glass_type;
+    //dest->parts.glassType = src->glass_type;
     // Glass type special case
-    // NOTE: LOOK INTO THIS AGAIN TO SEE IF YOU CAN DO OPAQUE GLASSES
-    if (dest->parts.glassType > 8) {
-        dest->parts.glassType = dest->parts.glassType - 5;
-    }*/
+    // NOTE: NEED TO IMPORT SWITCH/MIITOMO 2.3.0 GLASS TYPE TEXTURES
     dest->parts.glassType = ToVer3GlassTypeTable[src->glass_type];
 
     dest->parts.glassColor = markCommonColor(src->glass_color);

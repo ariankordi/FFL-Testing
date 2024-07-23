@@ -17,7 +17,7 @@ public:
 
     void initialize();
 
-    void bind(bool light_enable) const;
+    void bind(bool light_enable, FFLCharModel* pCharModel);
 
     void setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const;
 
@@ -54,30 +54,33 @@ private:
 private:
     enum VertexUniform
     {
-        VERTEX_UNIFORM_IT = 0,  // Inverse transpose of MV
-        VERTEX_UNIFORM_MV,
+        VERTEX_UNIFORM_MV = 0,
         VERTEX_UNIFORM_PROJ,
         VERTEX_UNIFORM_MAX
     };
 
     enum PixelUniform
     {
-        PIXEL_UNIFORM_CONST1 = 0,
-        PIXEL_UNIFORM_CONST2,
-        PIXEL_UNIFORM_CONST3,
-        PIXEL_UNIFORM_LIGHT_AMBIENT,
-        PIXEL_UNIFORM_LIGHT_DIFFUSE,
-        PIXEL_UNIFORM_LIGHT_DIR,
-        PIXEL_UNIFORM_LIGHT_ENABLE,
-        PIXEL_UNIFORM_LIGHT_SPECULAR,
-        PIXEL_UNIFORM_MATERIAL_AMBIENT,
-        PIXEL_UNIFORM_MATERIAL_DIFFUSE,
-        PIXEL_UNIFORM_MATERIAL_SPECULAR,
-        PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE,
-        PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER,
-        PIXEL_UNIFORM_MODE,
+        PIXEL_UNIFORM_MODULATE_TYPE = 0,
+        PIXEL_UNIFORM_GAMMA_TYPE,
+        PIXEL_UNIFORM_DRAW_TYPE,
+        PIXEL_UNIFORM_PAD0,
+        PIXEL_UNIFORM_CONST_COLOR1,
+        PIXEL_UNIFORM_CONST_COLOR2,
+        PIXEL_UNIFORM_CONST_COLOR3,
+        PIXEL_UNIFORM_LIGHT_DIR_IN_VIEW,
+        PIXEL_UNIFORM_LIGHT_COLOR,
+        PIXEL_UNIFORM_SSS_COLOR,
+        PIXEL_UNIFORM_SPECULAR_COLOR,
         PIXEL_UNIFORM_RIM_COLOR,
+        PIXEL_UNIFORM_HALF_LAMBERT_FACTOR,
+        PIXEL_UNIFORM_SSS_SPECULAR_FACTOR,
+        PIXEL_UNIFORM_SPECULAR_FACTOR_A,
+        PIXEL_UNIFORM_SPECULAR_FACTOR_B,
+        PIXEL_UNIFORM_SPECULAR_SHINNESS,
         PIXEL_UNIFORM_RIM_POWER,
+        PIXEL_UNIFORM_RIM_WIDTH,
+        PIXEL_UNIFORM_LIGHT_ENABLE,
         PIXEL_UNIFORM_MAX
     };
 
@@ -95,4 +98,6 @@ private:
 #endif
     FFLShaderCallback       mCallback;
     rio::TextureSampler2D   mSampler;
+    //bool                    mLightEnable;
+    FFLCharModel*           mpCharModel;
 };

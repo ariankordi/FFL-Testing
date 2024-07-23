@@ -175,7 +175,9 @@ void RootTask::prepare_()
             1.0f
         );
         mProjMtxIconBody = new rio::BaseMtx44f(projIconBody.getMatrix());
-
+        /*mProjMtxIconBody->m[1][1] *= -1.0f;
+        mProjMtxIconBody->m[2][3] /= 2;
+        */
     }
 
     // read Mii data from a folder
@@ -185,15 +187,16 @@ void RootTask::prepare_()
     // Check if the folder exists
     if (std::filesystem::exists(folderPath) && std::filesystem::is_directory(folderPath)) {
         for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
-            if (entry.is_regular_file() && entry.file_size() == sizeof(FFLStoreData)) {
+            if (entry.is_regular_file() && entry.file_size() >= 46) {
                 // Read the file content
                 std::ifstream file(entry.path(), std::ios::binary);
                 if (file.is_open()) {
-                    FFLStoreData data;
-                    file.read(reinterpret_cast<char*>(&data), sizeof(FFLStoreData));
-                    if (file.gcount() == sizeof(FFLStoreData)) {
+                    std::vector<char> data;
+                    data.resize(entry.file_size());
+                    file.read(&data[0], entry.file_size());
+                    //if (file.gcount() == sizeof(FFLStoreData)) {
                         mStoreDataArray.push_back(data);
-                    }
+                    //}
                     file.close();
                 }
             }
@@ -282,6 +285,9 @@ void RootTask::prepare_()
 // GetMiiDataNum()
 int maxMiis = 6;
 
+// forward declaration
+void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, int dataLength, RenderRequest *buf);
+
 void RootTask::createModel_() {
     FFLCharModelSource modelSource;
 
@@ -293,9 +299,13 @@ void RootTask::createModel_() {
     #else
     if (!mStoreDataArray.empty()) {
         // Use the custom Mii data array
+        FFLiCharInfo charInfo;
+
+        pickupCharInfoFromRenderRequest(&charInfo, mStoreDataArray[mMiiCounter].size(), reinterpret_cast<RenderRequest*>(&mStoreDataArray[mMiiCounter][0]));
+
         modelSource.index = 0;
-        modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
-        modelSource.pBuffer = &mStoreDataArray[mMiiCounter];
+        modelSource.dataSource = FFL_DATA_SOURCE_DIRECT_POINTER;
+        modelSource.pBuffer = &charInfo;
         // limit current counter by the amount of custom miis
         maxMiis = mStoreDataArray.size();
     } else {
@@ -327,19 +337,19 @@ void RootTask::createModel_() {
     if (!mpModel->initialize(arg, mShader)) {
         delete mpModel;
         mpModel = nullptr;
-    } else {
+    } /*else {
         mpModel->setScale({ 1.f, 1.f, 1.f });
         //mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
-    }
+    }*/
     mCounter = 0.0f;
 }
 
 #include <mii_ext_MiiPort.h>
 
-void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf) {
+void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, int dataLength, RenderRequest *buf) {
     MiiDataInputType inputType;
 
-    switch (buf->dataLength) {
+    switch (dataLength) {
         /*case sizeof(FFLStoreData):
         case sizeof(FFLiMiiDataOfficial):
         case sizeof(FFLiMiiDataCore):
@@ -428,9 +438,14 @@ void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf
         {
             // mii studio url data format is obfuscated
             // this decodes it in place and falls through
-            studioURLObfuscationDecode(buf->data);
+            char decodedData[48];
+            std::memcpy(decodedData, buf->data, dataLength);
+            studioURLObfuscationDecode(decodedData);
+            charInfo charInfoNX;
+            studioToCharInfoNX(&charInfoNX, reinterpret_cast<::charInfoStudio*>(decodedData));
+            charInfoNXToFFLiCharInfo(pCharInfo, &charInfoNX);
+            break;
         }
-        // NOTE: FALL THROUGH AND DECODE BUF AS RAW STUDIO DATA....
         case INPUT_TYPE_STUDIO_RAW:
             // we may not need this if we decode from and to buf->data but that's confusing
             charInfo charInfoNX;
@@ -453,7 +468,7 @@ void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf
 void RootTask::createModel_(RenderRequest *buf) {
     FFLiCharInfo charInfo;
 
-    /*if (!*/pickupCharInfoFromRenderRequest(&charInfo, buf);/*) {
+    /*if (!*/pickupCharInfoFromRenderRequest(&charInfo, buf->dataLength, buf);/*) {
         RIO_LOG("pickupCharInfoFromReqBuf returned false\n");
         mpModel = nullptr;
         mCounter = 0.0f;
@@ -762,6 +777,13 @@ RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RE
 */
     RIO_LOG("Render buffer bound.\n");
 
+    //if (gl_FragCoord.z > 0.98593) discard;
+    // Enable depth testing
+    /*glEnable(GL_DEPTH_TEST);
+    // Set the depth function to discard fragments with depth values greater than the threshold
+    glDepthFunc(GL_GREATER);
+    glDepthRange(0.98593f, 0.f);
+*/
     // Render the first frame to the buffer
     mpModel->drawOpa(view_mtx, *projMtx);
     RIO_LOG("drawOpa rendered to the buffer.\n");
@@ -1033,7 +1055,7 @@ void RootTask::calc_()
     }
     // Increment the counter to gradually change the camera's position over time
     if (!mServerOnly) {
-        mCounter += 1.f / 60;
+        mCounter += 1.f / 45;
     }
 
     // Get the view matrix from the camera, which represents the camera's orientation and position in the world

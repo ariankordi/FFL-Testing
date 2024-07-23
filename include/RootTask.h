@@ -65,7 +65,7 @@ private:
     bool                mInitialized;
     bool                mSocketIsListening;
     #if RIO_IS_WIN
-    std::vector<FFLStoreData> mStoreDataArray;
+    std::vector<std::vector<char>> mStoreDataArray;
     #endif
     FFLResourceDesc     mResourceDesc;
     Shader              mShader;

@@ -7,9 +7,6 @@
 
 Model::Model()
     : mCharModelDesc()
-    , mMtxRT(rio::Matrix34f::ident)
-    , mScale { 1.0f, 1.0f, 1.0f }
-    , mMtxSRT(rio::Matrix34f::ident)
     , mpShader(nullptr)
     , mIsEnableSpecialDraw(false)
     , mLightEnable(true)
@@ -34,15 +31,6 @@ void Model::initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource
     mCharModelSource = *p_source;
 }
 
-void Model::updateMtxSRT_()
-{
-    mMtxSRT = mMtxRT;
-
-    reinterpret_cast<rio::Vector3f&>(mMtxSRT.v[0].x) *= static_cast<const rio::Vector3f&>(mScale);
-    reinterpret_cast<rio::Vector3f&>(mMtxSRT.v[1].x) *= static_cast<const rio::Vector3f&>(mScale);
-    reinterpret_cast<rio::Vector3f&>(mMtxSRT.v[2].x) *= static_cast<const rio::Vector3f&>(mScale);
-}
-
 void Model::enableSpecialDraw()
 {
     mIsEnableSpecialDraw = true;
@@ -50,7 +38,7 @@ void Model::enableSpecialDraw()
 
 void Model::drawOpa(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx)
 {
-    setViewUniform_(mMtxSRT, view_mtx, proj_mtx);
+    setViewUniform_(view_mtx, proj_mtx);
 
     if (mIsEnableSpecialDraw)
         drawOpaSpecial_();
@@ -60,7 +48,7 @@ void Model::drawOpa(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj
 
 void Model::drawXlu(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx)
 {
-    setViewUniform_(mMtxSRT, view_mtx, proj_mtx);
+    setViewUniform_(view_mtx, proj_mtx);
 
     if (mIsEnableSpecialDraw)
     {
@@ -73,11 +61,11 @@ void Model::drawXlu(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj
     }
 }
 
-void Model::setViewUniform_(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx)
+void Model::setViewUniform_(/*const rio::BaseMtx34f& model_mtx,*/ const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx)
 {
     RIO_ASSERT(mpShader);
-    mpShader->bind(mLightEnable);
-    mpShader->setViewUniform(model_mtx, view_mtx, proj_mtx);
+    mpShader->bind(mLightEnable, mpCharModel);
+    mpShader->setViewUniform(rio::Matrix34f::ident, view_mtx, proj_mtx);
 }
 
 void Model::drawOpaNormal_()
@@ -163,10 +151,12 @@ void Model::drawXluSpecial_()
 
         FFLDrawXlu(mpCharModel);
     }
+
 }
 
 bool Model::initializeCpu_()
 {
+
     mInitializeCpuResult = FFLInitCharModelCPUStep(mpCharModel, &mCharModelSource, &mCharModelDesc);
     if (mInitializeCpuResult != FFL_RESULT_OK) {
         RIO_LOG("FFLInitCharModelCPUStep returned: %i\n", mInitializeCpuResult);
@@ -175,11 +165,11 @@ bool Model::initializeCpu_()
     return true;
 }
 
-void Model::initializeGpu_(const Shader& shader)
+void Model::initializeGpu_(Shader& shader)
 {
     mpShader = &shader;
     // disable light when rendering faceline textures
-    mpShader->bind(false);
+    mpShader->bind(false, mpCharModel);
     FFLInitCharModelGPUStep(mpCharModel);
     //rio::Window::instance()->makeContextCurrent();
 }

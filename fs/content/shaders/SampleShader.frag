@@ -126,12 +126,12 @@ void main()
     vec4 albedo = GetAlbedo();
     // NOTE: faceline color A channel is 1 here but 0 on switch, needs to be modified
     // NOTE: THE BELOW CODE ALSO TARGETS BEARD!!!!
-    if(drawType == DRAW_TYPE_FACELINE &&
+    /*if(drawType == DRAW_TYPE_FACELINE &&
        modulateType == MODULATE_TYPE_TEXTRUE &&
        albedo.a != 0.0f)
     {
         albedo.a = 0.0f;
-    }
+    }*/
     if(albedo.a == 0.0f && drawType != DRAW_TYPE_FACELINE)
     {
         discard;

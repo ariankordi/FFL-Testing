@@ -579,6 +579,9 @@ void Shader::initialize()
     mCallback.pDrawFunc = &Shader::drawCallback_;
     mCallback.pSetMatrixFunc = &Shader::setMatrixCallback_;
     FFLSetShaderCallback(&mCallback);
+    // HACK: have to set this AFTER FFLSetShaderCallback (initializes it to false)
+    // this sets the faceline color alpha to 0, which is needed by this shader
+    mCallback.facelineColorIsTransparent = true;
 }
 
 void Shader::bind(bool light_enable, FFLCharModel* pCharModel)
@@ -823,6 +826,15 @@ void Shader::draw_(const FFLDrawParam& draw_param)
     setModulate_(draw_param.modulateParam);
     setMaterial_(draw_param);
 
+    // HACK: INJECT SWITCH GLASS NORMALS
+    // the switch shader does a reflection on the glasses
+    // however neither the FFLResHigh or AFLResHigh resources
+    // have normals on the glass mesh so this is the easiest
+    // way to hack it in
+    static const u32 cGlassNormalBufferLE[] = {
+        0x567a67ca, 0x567a6436, 0x56759fca, 0x56759c36
+    };
+
     if (draw_param.primitiveParam.pIndexBuffer != nullptr)
     {
 #if RIO_IS_CAFE
@@ -925,6 +937,9 @@ void Shader::draw_(const FFLDrawParam& draw_param)
                         RIO_GL_CALL(glVertexAttribPointer(location, 2, GL_FLOAT, false, stride, nullptr));
                         break;
                     case FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL:
+                        // force this arbitrary normal buffer when glass mesh is being drawn
+                        if (draw_param.modulateParam.type == FFL_MODULATE_TYPE_SHAPE_GLASS)
+                            RIO_GL_CALL(glBufferData(GL_ARRAY_BUFFER, sizeof(cGlassNormalBufferLE), cGlassNormalBufferLE, GL_STATIC_DRAW));
                         RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_INT_2_10_10_10_REV, true, stride, nullptr));
                         break;
                     /*case FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT:

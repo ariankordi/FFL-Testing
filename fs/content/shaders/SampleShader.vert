@@ -62,7 +62,7 @@ void main()
     gl_Position = PROJECT(proj,vec4(vPos,1.0f));
     */
     gl_Position = proj * mv * i_Position;
-    Out.normal = normalize(mat3(mv) * i_Normal);
+    Out.normal = mat3(mv) * i_Normal.xyz;
 
     Out.texCoord = i_TexCoord.xy;
     //Out.normal = TRANSFORM_VEC(mv,i_Normal);

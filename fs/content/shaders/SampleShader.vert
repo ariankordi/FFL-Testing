@@ -20,8 +20,10 @@ out gl_PerVertex
 };
 
 layout( location = 0 ) in vec4 i_Position;
-layout( location = 1 ) in vec3 i_Normal;
-layout( location = 2 ) in vec2 i_TexCoord;
+// order of TexCoord and Normal flipped
+// to be compliant with rio models
+layout( location = 1 ) in vec2 i_TexCoord;
+layout( location = 2 ) in vec3 i_Normal;
 layout( location = 3 ) in vec4 i_Parameter;
 
 // TODO: you can use rio mShader.setUniformArray to bind this(?)

@@ -702,10 +702,10 @@ void drawMiiBodyFAKE(rio::Texture2D* renderTextureColor, rio::Texture2D* renderT
     delete bodyTexture;
 }
 
-void RootTask::drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, rio::BaseMtx44f& proj_mtx) {
+void RootTask::drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx) {
 
     // SELECT BODY MODEL
-    const rio::mdl::Model* model = bodyModels[gender];
+    const rio::mdl::Model* model = bodyModels[charInfo->gender];
 
     const rio::mdl::Mesh* const meshes = model->meshes();
 
@@ -715,15 +715,11 @@ void RootTask::drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, r
         const rio::mdl::Mesh& mesh = meshes[i];
 
         // BIND SHADER
-        bodyShader.bind();
+        //bodyShader.bind();
+        mShader.bind(true, charInfo);
         //RIO_GL_CALL(glBindVertexArray(vao));
 
         // set body uniforms
-        // not the nwf light direction but eh
-        bodyShader.setUniform(-0.4531539381f, 0.4226179123f, 0.7848858833f, 0.0f, bodyShader.getVertexUniformLocation("lightDir"), u32(-1));
-        bodyShader.setUniform(proj_mtx, bodyShader.getVertexUniformLocation("proj"), u32(-1));
-
-
         rio::BaseMtx34f view_mtx;
         /*rio::LookAtCamera camera;
         camera.pos() = { 0.0f, 130.37f, 415.53f };
@@ -735,25 +731,22 @@ void RootTask::drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, r
         mCamera.pos() = { mCamera.pos().x, mCamera.pos().y + 93.32f, mCamera.pos().z };
         mCamera.getMatrix(&view_mtx);
 
-        rio::Matrix44f view44;
-        view44.fromMatrix34(view_mtx);
+        mShader.setViewUniform(rio::Matrix34f::ident, view_mtx, proj_mtx);
 
-        bodyShader.setUniform(view44, bodyShader.getVertexUniformLocation("view"), u32(-1));
-        bodyShader.setUniform(rio::Matrix44f::ident, bodyShader.getVertexUniformLocation("world"), u32(-1));
+        const FFLColor& favoriteColor = FFLGetFavoriteColor(charInfo->favoriteColor);
 
-
-        bodyShader.setUniform(3.0f, u32(-1), bodyShader.getFragmentUniformLocation("SP_power"));
-        bodyShader.setUniform(0.7f, 0.7f, 0.7f, u32(-1), bodyShader.getFragmentUniformLocation("ambient"));
-        // FAVORITE COLOR
-        bodyShader.setUniform(favoriteColor.r, favoriteColor.g, favoriteColor.b, u32(-1), bodyShader.getFragmentUniformLocation("base"));
-
-        bodyShader.setUniform(0.3f, 0.3f, 0.3f, u32(-1), bodyShader.getFragmentUniformLocation("diffuse"));
-        bodyShader.setUniform(0.4f, 0.4f, 0.4f, u32(-1), bodyShader.getFragmentUniformLocation("rim"));
-        bodyShader.setUniform(2.0f, u32(-1), bodyShader.getFragmentUniformLocation("rimSP_power"));
-        bodyShader.setUniform(0.17f, 0.17f, 0.17f, u32(-1), bodyShader.getFragmentUniformLocation("specular"));
-        bodyShader.setUniform(u32(7), u32(-1), bodyShader.getFragmentUniformLocation("PS_PUSH.alphaFunc"));
-        bodyShader.setUniform(0.0f, u32(-1), bodyShader.getFragmentUniformLocation("PS_PUSH.alphaRef"));
-
+        const FFLModulateType modulateType = static_cast<FFLModulateType>(20);
+        const FFLModulateParam modulateParam = {
+            FFL_MODULATE_MODE_0,
+            // CUSTOM MODULATE TYPE FOR BODY
+            modulateType,
+            &favoriteColor,
+            nullptr, // no color G
+            nullptr, // no color B
+            nullptr  // no texture
+        };
+        mShader.setModulate(modulateParam);
+        mShader.setMaterial(modulateType);
         // finally, the uniforms are all set
 
         mesh.draw();
@@ -886,7 +879,7 @@ RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RE
 
         const FFLColor favoriteColor = FFLGetFavoriteColor(favoriteColorIndex);
         //drawMiiBodyFAKE(renderTextureColor, renderTextureDepth, favoriteColorIndex);
-        drawMiiBodyREAL(favoriteColor, charModel->charInfo.gender,  *projMtx);
+        drawMiiBodyREAL(&charModel->charInfo,  *projMtx);
     }
 
     renderBuffer.bind();
@@ -1162,10 +1155,8 @@ void RootTask::calc_()
 
     if (mpModel != nullptr) {
         mpModel->enableSpecialDraw();
-        FFLiCharInfo charInfo = reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel())->charInfo;
-
         mpModel->drawOpa(view_mtx, mProjMtx);
-        drawMiiBodyREAL(FFLGetFavoriteColor(charInfo.favoriteColor), charInfo.gender, mProjMtx);
+        drawMiiBodyREAL(&reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel())->charInfo, mProjMtx);
         mpModel->drawXlu(view_mtx, mProjMtx);
     }
 }

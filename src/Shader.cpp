@@ -217,7 +217,7 @@ const DrawParamMaterial cNoseMaterials[10] = {
     { 0.3f, 0.0f, { 0.01960913f, 0.0f, 0.0f }, { { 0.01960913f, 0.00784381f, 0.00392195f }, 2.6f, 0.02f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 0.55f, 0.0f } } // line 39
 };
 
-const DrawParamMaterial cBodyMaterials[10] = {
+const DrawParamMaterial cBodyMaterials[12] = {
     { 0.5f, 0.0f, { 0.1647106f, 0.01176563f, 0.00392195f }, { { 0.1647106f, 0.0235309f, 0.01568734f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } }, // line 43
     { 0.5f, 0.0f, { 0.2745156f, 0.0f, 0.0f }, { { 0.2000051f, 0.08627796f, 0.01960913f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } },
     { 0.5f, 0.0f, { 0.2000051f, 0.08235628f, 0.00392195f }, { { 0.2000051f, 0.1686323f, 0.0235309f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } },
@@ -227,10 +227,12 @@ const DrawParamMaterial cBodyMaterials[10] = {
     { 0.5f, 0.0f, { 0.01176563f, 0.06666958f, 0.1725539f }, { { 0.04706119f, 0.1725539f, 0.2156916f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } },
     { 0.5f, 0.0f, { 0.04706119f, 0.03529608f, 0.09804292f }, { { 0.1921619f, 0.07059128f, 0.09804292f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } },
     { 0.5f, 0.0f, { 0.01960913f, 0.01568734f, 0.1333377f }, { { 0.09019956f, 0.03137433f, 0.1333377f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } },
-    { 0.5f, 0.0f, { 0.0f, 0.0f, 0.01568734f }, { { 0.03137433f, 0.01176563f, 0.00392195f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } } // line 52
+    { 0.5f, 0.0f, { 0.0f, 0.0f, 0.01568734f }, { { 0.03137433f, 0.01176563f, 0.00392195f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } }, // line 52
+    { 0.5f, 0.0f, { 0.04313947f, 0.08627796f, 0.1725539f }, { { 0.2196132f, 0.1725539f, 0.1725539f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } },
+    { 0.5f, 0.0f, { 0.0f, 0.0f, 0.0f }, { { 0.01960913f, 0.01960913f, 0.01960913f }, 1.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.0f } } // line 14
 };
 
-const DrawParamMaterial cHatMaterials[10] = {
+const DrawParamMaterial cHatMaterials[12] = {
     { 0.6f, 1.0f, { 0.3333392f, 0.0f, 0.00392195f }, { { 0.2470644f, 0.0f, 0.00784381f }, 2.0f, 0.0f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } }, // line 56
     { 0.6f, 1.0f, { 0.5098094f, 0.2745156f, 0.03921773f }, { { 0.2156916f, 0.1451026f, 0.02745257f }, 2.0f, 0.02f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } },
     { 0.6f, 1.0f, { 0.3921627f, 0.1372593f, 0.03921773f }, { { 0.2352996f, 0.1176511f, 0.03921773f }, 1.1f, 0.02f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } },
@@ -240,7 +242,9 @@ const DrawParamMaterial cHatMaterials[10] = {
     { 0.6f, 1.0f, { 0.07843459f, 0.2235348f, 0.345104f }, { { 0.06274787f, 0.1647106f, 0.2392212f }, 2.0f, 0.8f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } },
     { 0.6f, 1.0f, { 0.3137313f, 0.05882626f, 0.07843459f }, { { 0.2745156f, 0.05882626f, 0.07843459f }, 2.0f, 0.02f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } },
     { 0.6f, 1.0f, { 0.1176511f, 0.02745257f, 0.3411824f }, { { 0.08627796f, 0.01176563f, 0.1725539f }, 2.0f, 0.02f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } },
-    { 0.6f, 1.0f, { 0.03921773f, 0.01960913f, 0.00784381f }, { { 0.03921773f, 0.01960913f, 0.00784381f }, 2.0f, 0.02f, 2.0f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } } // line 65
+    { 0.6f, 1.0f, { 0.03921773f, 0.01960913f, 0.00784381f }, { { 0.03921773f, 0.01960913f, 0.00784381f }, 2.0f, 0.02f, 2.0f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } }, // line 65
+    { 0.6f, 1.0f, { 0.4862802f, 0.4862802f, 0.3921627f }, { { 0.1568674f, 0.1568674f, 0.1176511f }, 2.0f, 0.02f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } }, // line 28
+    { 0.6f, 1.0f, { 0.0f, 0.0f, 0.0f }, { { 0.00784381f, 0.00784381f, 0.00784381f }, 2.0f, 0.02f, 0.8f }, { { 0.0f, 0.0f, 0.0f }, 1.0f, 0.5f } } // line 29
 };
 
 const DrawParamMaterial cHairMaterials[100] = {
@@ -588,9 +592,9 @@ void Shader::initialize()
     mCallback.facelineColorIsTransparent = true;
 }
 
-void Shader::bind(bool light_enable, FFLCharModel* pCharModel)
+void Shader::bind(bool light_enable, FFLiCharInfo* pCharInfo)
 {
-    mpCharModel = pCharModel;
+    mpCharInfo = pCharInfo;
     mShader.bind();
 #if RIO_IS_CAFE
     GX2SetFetchShader(&mFetchShader);
@@ -684,24 +688,6 @@ void Shader::setModulate_(const FFLModulateParam& modulateParam)
 {
     setModulateMode_(modulateParam.mode);
 
-    #define DRAW_TYPE_NORMAL   0
-    #define DRAW_TYPE_FACELINE 1
-    #define DRAW_TYPE_HAIR     2
-    int drawType;
-
-    switch (modulateParam.type) {
-        case FFL_MODULATE_TYPE_SHAPE_FACELINE:
-            drawType = DRAW_TYPE_FACELINE;
-            break;
-        case FFL_MODULATE_TYPE_SHAPE_HAIR:
-            drawType = DRAW_TYPE_HAIR;
-            break;
-        default:
-            drawType = DRAW_TYPE_NORMAL;
-            break;
-    }
-    mShader.setUniform(s32(drawType), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_DRAW_TYPE]);
-
     // if you want to change colors based on modulateParam.type
     // FFL_MODULATE_TYPE_SHAPE_HAIR
     // hair color: pColorR/const1
@@ -730,16 +716,16 @@ void Shader::setModulate_(const FFLModulateParam& modulateParam)
     bindTexture_(modulateParam);
 }
 
-void Shader::setMaterial_(const FFLDrawParam& drawParam)
+void Shader::setMaterial_(const FFLModulateType modulateType)
 {
     // we need to get favorite/faceline/hair/beard color from somewhere so
-    FFLiCharModel *charModel = reinterpret_cast<FFLiCharModel*>(mpCharModel);
+    //FFLiCharInfo* mpCharInfo = &reinterpret_cast<FFLiCharModel*>(mpCharModel)->charInfo;
 
-    //RIO_LOG("[Shader::setMaterial_] your mii's favorite color id is: %d\n", charModel->charInfo.favoriteColor);
+    //RIO_LOG("[Shader::setMaterial_] your mii's favorite color id is: %d\n", charModel->mpCharInfo->favoriteColor);
 
     DrawParamMaterial drawParamMaterial;
     int commonColor;
-    switch (drawParam.modulateParam.type) {
+    switch (modulateType) {
         case FFL_MODULATE_TYPE_SHAPE_NOSELINE:
         case FFL_MODULATE_TYPE_SHAPE_MASK:
             drawParamMaterial = cMaskMaterial;
@@ -751,31 +737,35 @@ void Shader::setMaterial_(const FFLDrawParam& drawParam)
         case FFL_MODULATE_TYPE_SHAPE_FOREHEAD:
         case FFL_MODULATE_TYPE_SHAPE_FACELINE:
             // does not need conversion
-            drawParamMaterial = cFacelineMaterials[charModel->charInfo.parts.facelineColor];
+            drawParamMaterial = cFacelineMaterials[mpCharInfo->parts.facelineColor];
             break;
         case FFL_MODULATE_TYPE_SHAPE_NOSE:
-            drawParamMaterial = cNoseMaterials[charModel->charInfo.parts.facelineColor];
+            drawParamMaterial = cNoseMaterials[mpCharInfo->parts.facelineColor];
             break;
         // body: favorite color
+        // TODO: TODO: ADD THIS AS A REAL CONSTANT
+        case 20:
+            drawParamMaterial = cBodyMaterials[mpCharInfo->favoriteColor];
+            break;
         case FFL_MODULATE_TYPE_SHAPE_CAP:
-            drawParamMaterial = cHatMaterials[charModel->charInfo.favoriteColor];
+            drawParamMaterial = cHatMaterials[mpCharInfo->favoriteColor];
             break;
 
         case FFL_MODULATE_TYPE_SHAPE_HAIR:
             // HACK: ver3 hair color 0 maps to common color 8
-            if (!isCommonColorMarked(charModel->charInfo.parts.hairColor) && charModel->charInfo.parts.hairColor == 0)
+            if (!isCommonColorMarked(mpCharInfo->parts.hairColor) && mpCharInfo->parts.hairColor == 0)
                 commonColor = 8;
             else
-                commonColor = unmarkCommonColor(charModel->charInfo.parts.hairColor);
+                commonColor = unmarkCommonColor(mpCharInfo->parts.hairColor);
             drawParamMaterial = cHairMaterials[commonColor];
             //RIO_LOG("hair color: %d, specular factor B: %f\n", commonColor, drawParamMaterial.specular.factorB);
             break;
         case FFL_MODULATE_TYPE_SHAPE_BEARD:
             // HACK: same as above
-            if (!isCommonColorMarked(charModel->charInfo.parts.beardColor) && charModel->charInfo.parts.beardColor == 0)
+            if (!isCommonColorMarked(mpCharInfo->parts.beardColor) && mpCharInfo->parts.beardColor == 0)
                 commonColor = 8;
             else
-                commonColor = unmarkCommonColor(charModel->charInfo.parts.beardColor);
+                commonColor = unmarkCommonColor(mpCharInfo->parts.beardColor);
             drawParamMaterial = cBeardMaterials[commonColor];
             break;
         default:
@@ -803,32 +793,31 @@ void Shader::setMaterial_(const FFLDrawParam& drawParam)
     mShader.setUniform(drawParamMaterial.rimLight.width, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_WIDTH]);
 
 
-    /*
-    // NOTE: JASMINE HAIR
-    mShader.setUniform(0.01177f, 0.00392f, 0.0f, 1.00f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_SSS_COLOR]);
+    // set draw type here
+    #define DRAW_TYPE_NORMAL   0
+    #define DRAW_TYPE_FACELINE 1
+    #define DRAW_TYPE_HAIR     2
+    int drawType;
 
-    mShader.setUniform(0.12549f, 0.04706f, 0.00784f, 1.00f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_SPECULAR_COLOR]);
-
-    mShader.setUniform(0.0f, 0.0f, 0.0f, 1.00f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_COLOR]);
-
-
-    mShader.setUniform(0.45f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_HALF_LAMBERT_FACTOR]);
-    mShader.setUniform(1.00f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_SSS_SPECULAR_FACTOR]);
-
-    mShader.setUniform(1.00f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_SPECULAR_FACTOR_A]);
-    mShader.setUniform(0.06f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_SPECULAR_FACTOR_B]);
-    mShader.setUniform(0.80f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_SPECULAR_SHINNESS]);
-
-    mShader.setUniform(1.00f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_POWER]);
-    mShader.setUniform(0.50f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_WIDTH]);
-    */
+    switch (modulateType) {
+        case FFL_MODULATE_TYPE_SHAPE_FACELINE:
+            drawType = DRAW_TYPE_FACELINE;
+            break;
+        case FFL_MODULATE_TYPE_SHAPE_HAIR:
+            drawType = DRAW_TYPE_HAIR;
+            break;
+        default:
+            drawType = DRAW_TYPE_NORMAL;
+            break;
+    }
+    mShader.setUniform(s32(drawType), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_DRAW_TYPE]);
 }
 
 void Shader::draw_(const FFLDrawParam& draw_param)
 {
     setCulling(draw_param.cullMode);
     setModulate_(draw_param.modulateParam);
-    setMaterial_(draw_param);
+    setMaterial_(draw_param.modulateParam.type);
 
     // HACK: INJECT SWITCH GLASS NORMALS
     // the switch shader does a reflection on the glasses

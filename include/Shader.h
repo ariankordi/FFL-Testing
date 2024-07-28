@@ -17,9 +17,19 @@ public:
 
     void initialize();
 
-    void bind(bool light_enable, FFLCharModel* pCharModel);
+    void bind(bool light_enable, FFLiCharInfo* charInfo);
 
     void setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const;
+
+    void setModulate(const FFLModulateParam& modulateParam)
+    {
+        setModulate_(modulateParam);
+    }
+
+    void setMaterial(const FFLModulateType modulateType)
+    {
+        setMaterial_(modulateType);
+    }
 
     void applyAlphaTestEnable() const
     {
@@ -43,7 +53,7 @@ private:
     void setModulateMode_(FFLModulateMode mode);
     void setModulate_(const FFLModulateParam& modulateParam);
 
-    void setMaterial_(const FFLDrawParam& drawParam);
+    void setMaterial_(const FFLModulateType modulateType);
 
     void draw_(const FFLDrawParam& draw_param);
     static void drawCallback_(void* p_obj, const FFLDrawParam& draw_param);
@@ -99,5 +109,5 @@ private:
     FFLShaderCallback       mCallback;
     rio::TextureSampler2D   mSampler;
     //bool                    mLightEnable;
-    FFLCharModel*           mpCharModel;
+    FFLiCharInfo*           mpCharInfo;
 };

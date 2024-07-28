@@ -61,7 +61,7 @@ private:
     void createModel_();
     //void createModel_(char (*buf)[FFLICHARINFO_SIZE]);
     void createModel_(RenderRequest *buf);
-    void drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, rio::BaseMtx44f& proj_mtx);
+    void drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx);
 
 private:
     bool                mInitialized;

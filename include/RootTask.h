@@ -3,6 +3,7 @@
 #include <gfx/rio_Camera.h>
 #include <task/rio_Task.h>
 
+#include <nn/ffl.h>
 #include <nn/ffl/FFLiMiiData.h>
 
 #define FFLICHARINFO_SIZE sizeof(FFLiCharInfo)
@@ -60,6 +61,7 @@ private:
     void createModel_();
     //void createModel_(char (*buf)[FFLICHARINFO_SIZE]);
     void createModel_(RenderRequest *buf);
+    void drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, rio::BaseMtx44f& proj_mtx);
 
 private:
     bool                mInitialized;

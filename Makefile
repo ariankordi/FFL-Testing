@@ -121,7 +121,7 @@ $(EXEC): $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ)
 
 # Clean up
 clean:
-	rm -f $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ) $(EXEC) src/Shader*.o build/*.o build/*.d build/*.map
+	rm -f $(NINTEXUTILS_OBJ) $(RIO_OBJ) $(FFL_OBJ) $(OBJ) $(EXEC) src/Shader*.o build/*.o build/*.d build/*.map ffl_testing_2_debug64_no_clip_control
 
 # Phony targets
 .PHONY: all clean no_clip_control

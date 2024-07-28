@@ -1,4 +1,5 @@
 #include "gpu/rio_Texture.h"
+#include "math/rio_Matrix.h"
 #include "nn/ffl/detail/FFLiCharInfo.h"
 #include <Model.h>
 #include <RootTask.h>
@@ -8,6 +9,9 @@
 #include <gfx/rio_Window.h>
 #include <gfx/rio_Graphics.h>
 #include <gpu/rio_RenderState.h>
+
+#include <gfx/mdl/res/rio_ModelCacher.h>
+#include <gfx/mdl/rio_Model.h>
 
 #include <nn/ffl/FFLiSwapEndian.h>
 
@@ -48,6 +52,12 @@ int addrlen = sizeof(address);
 #include <filesystem>
 #include <fstream>
 #endif
+
+// forward declarations for drawing body model
+//rio::mdl::res::Model* bodyResModels[FFL_GENDER_MAX];
+const rio::mdl::Model* bodyModels[FFL_GENDER_MAX];
+
+rio::Shader bodyShader;
 
 void RootTask::prepare_()
 {
@@ -160,7 +170,7 @@ void RootTask::prepare_()
         rio::PerspectiveProjection proj(
             500.0f, // Near
             700.0f, // Far
-            fovy, // fovy
+            fovy,// * 1.6f, // fovy
             aspect // Aspect ratio
         );
         // The near and far values define the depth range of the view frustum (500.0f to 700.0f)
@@ -273,6 +283,23 @@ void RootTask::prepare_()
         GLFWwindow* glfwWindow = rio::Window::instance()->getNativeWindow().getGLFWwindow();
         glfwSetWindowAspectRatio(glfwWindow, window->getWidth(), window->getHeight());
     #endif // RIO_IS_WIN
+
+    // load (just male for now) body model
+    // the male and female bodies are like identical
+    // from the torso up (only perspective we use)
+    char key[17] = "mii_static_body0";
+    for (u32 i = 0; i < FFL_GENDER_MAX; i++)
+    {
+        RIO_LOG("loading model: %s\n", key);
+        //bodyResModels[i] = rio::mdl::res::ModelCacher::instance()->loadModel(key, key); // "body0", "body1" per gender
+        const rio::mdl::res::Model* resModel = rio::mdl::res::ModelCacher::instance()->loadModel(key, key);
+        key[sizeof(key)-2]++; // iterate last character
+        RIO_ASSERT(resModel);
+
+        bodyModels[i] = new rio::mdl::Model(resModel);
+    }
+    //RIO_ASSERT(loadBodyGLTF(&gltfBodyModel, bodyGltfMaleFilename));
+    bodyShader.load("FFLBodyShader");
 
     mInitialized = true;
 }
@@ -545,7 +572,7 @@ void loadRawRGBAImage(const char* filePath, int width, int height, GLuint textur
     return;//texture;
 }
 
-void drawMiiBody(rio::Texture2D* renderTextureColor, rio::Texture2D* renderTextureDepth, int favoriteColorIndex) {//, FFLGender gender) {
+void drawMiiBodyFAKE(rio::Texture2D* renderTextureColor, rio::Texture2D* renderTextureDepth, int favoriteColorIndex) {//, FFLGender gender) {
     rio::Texture2D *bodyTexture = new rio::Texture2D(rio::TEXTURE_FORMAT_R8_G8_B8_A8_UNORM, 1600, 1600, 1);
     // TODO: CACHE THIS CACHE THIS
     // AND POTENTIALLY MAKE THEM SMALL IMAGES
@@ -658,6 +685,65 @@ void drawMiiBody(rio::Texture2D* renderTextureColor, rio::Texture2D* renderTextu
     */
     shader.unload();
     delete bodyTexture;
+}
+
+void RootTask::drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, rio::BaseMtx44f& proj_mtx) {
+
+    // SELECT BODY MODEL
+    const rio::mdl::Model* model = bodyModels[gender];
+
+    const rio::mdl::Mesh* const meshes = model->meshes();
+
+    // Render each mesh in order
+    for (u32 i = 0; i < model->numMeshes(); i++)
+    {
+        const rio::mdl::Mesh& mesh = meshes[i];
+
+        // BIND SHADER
+        bodyShader.bind();
+        //RIO_GL_CALL(glBindVertexArray(vao));
+
+        // set body uniforms
+        // not the nwf light direction but eh
+        bodyShader.setUniform(-0.4531539381f, 0.4226179123f, 0.7848858833f, 0.0f, bodyShader.getVertexUniformLocation("lightDir"), u32(-1));
+        bodyShader.setUniform(proj_mtx, bodyShader.getVertexUniformLocation("proj"), u32(-1));
+
+
+        rio::BaseMtx34f view_mtx;
+        /*rio::LookAtCamera camera;
+        camera.pos() = { 0.0f, 130.37f, 415.53f };
+        camera.at() = { 0.0f, 130.37f, 0.0f };
+        camera.setUp({ 0.0f, 1.0f, 0.0f });
+        camera.getMatrix(&view_mtx);
+        */
+        mCamera.at() = { mCamera.at().x, mCamera.at().y + 93.32f, mCamera.at().z };
+        mCamera.pos() = { mCamera.pos().x, mCamera.pos().y + 93.32f, mCamera.pos().z };
+        mCamera.getMatrix(&view_mtx);
+
+        rio::Matrix44f view44;
+        view44.fromMatrix34(view_mtx);
+
+        bodyShader.setUniform(view44, bodyShader.getVertexUniformLocation("view"), u32(-1));
+        bodyShader.setUniform(rio::Matrix44f::ident, bodyShader.getVertexUniformLocation("world"), u32(-1));
+
+
+        bodyShader.setUniform(3.0f, u32(-1), bodyShader.getFragmentUniformLocation("SP_power"));
+        bodyShader.setUniform(0.7f, 0.7f, 0.7f, u32(-1), bodyShader.getFragmentUniformLocation("ambient"));
+        // FAVORITE COLOR
+        bodyShader.setUniform(favoriteColor.r, favoriteColor.g, favoriteColor.b, u32(-1), bodyShader.getFragmentUniformLocation("base"));
+
+        bodyShader.setUniform(0.3f, 0.3f, 0.3f, u32(-1), bodyShader.getFragmentUniformLocation("diffuse"));
+        bodyShader.setUniform(0.4f, 0.4f, 0.4f, u32(-1), bodyShader.getFragmentUniformLocation("rim"));
+        bodyShader.setUniform(2.0f, u32(-1), bodyShader.getFragmentUniformLocation("rimSP_power"));
+        bodyShader.setUniform(0.17f, 0.17f, 0.17f, u32(-1), bodyShader.getFragmentUniformLocation("specular"));
+        bodyShader.setUniform(u32(7), u32(-1), bodyShader.getFragmentUniformLocation("PS_PUSH.alphaFunc"));
+        bodyShader.setUniform(0.0f, u32(-1), bodyShader.getFragmentUniformLocation("PS_PUSH.alphaRef"));
+
+        // finally, the uniforms are all set
+
+        mesh.draw();
+    }
+    //bodyShader.unload();
 }
 
 void RootTask::handleRenderRequest(char* buf, rio::BaseMtx34f view_mtx) {
@@ -775,8 +861,10 @@ RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RE
 
         if (charModel->charInfo.favoriteColor < FFL_FAVORITE_COLOR_MAX)
             favoriteColorIndex = charModel->charInfo.favoriteColor;
-        // maybe gender is needed here too
-        drawMiiBody(renderTextureColor, renderTextureDepth, favoriteColorIndex);
+
+        const FFLColor favoriteColor = FFLGetFavoriteColor(favoriteColorIndex);
+        //drawMiiBodyFAKE(renderTextureColor, renderTextureDepth, favoriteColorIndex);
+        drawMiiBodyREAL(favoriteColor, charModel->charInfo.gender,  *projMtx);
     }
 
     renderBuffer.bind();
@@ -1052,7 +1140,10 @@ void RootTask::calc_()
 
     if (mpModel != nullptr) {
         mpModel->enableSpecialDraw();
+        FFLiCharInfo charInfo = reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel())->charInfo;
+
         mpModel->drawOpa(view_mtx, mProjMtx);
+        drawMiiBodyREAL(FFLGetFavoriteColor(charInfo.favoriteColor), charInfo.gender, mProjMtx);
         mpModel->drawXlu(view_mtx, mProjMtx);
     }
 }

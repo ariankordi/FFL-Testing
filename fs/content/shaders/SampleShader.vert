@@ -24,6 +24,8 @@ layout( location = 1 ) in vec3 i_Normal;
 layout( location = 2 ) in vec2 i_TexCoord;
 layout( location = 3 ) in vec4 i_Parameter;
 
+// TODO: you can use rio mShader.setUniformArray to bind this(?)
+// https://github.com/aboood40091/RIO-Tests/blob/b9db5fb506c92d89c526d6c93efa0d44a7260510/07_Uniform-Variables-2/src/roottask.cpp#L193
 /*
 layout(std140) uniform u_Matrix
 {

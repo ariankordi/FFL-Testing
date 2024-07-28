@@ -4,7 +4,7 @@
 #include <math/rio_Matrix.h>
 #include <misc/rio_MemUtil.h>
 
-// for unmarkCommonColor
+// for isCommonColorMarked
 #include <nn/ffl/FFLiColor.h>
 
 #if RIO_IS_CAFE
@@ -128,6 +128,11 @@ void gramSchmidtOrthonormalizeMtx34(rio::BaseMtx34f* mat)
     mat->m[1][2] = c2New.y;
     mat->m[2][2] = c2New.z;
 }
+
+// NOTE: there isn't a concrete way to determine the gamma type
+// I don't know how it's being set OR if the decomp provides a way to set it
+//static bool sGammaType = FFLiUseOffScreenSrgbFetch() ? 0 : 1;//1 : 0;
+const bool sGammaType = 1;
 
 // MATERIALS SECTION!!!!!
 // nn::mii::Material contains DrawParamMaterial
@@ -447,8 +452,7 @@ const DrawParamMaterial cBeardMaterials[100] = {
 
 // NOTE: WHERE DOES THIS COME FROM? just taken from a render
 const rio::BaseVec4f cLightDir = { -0.12279f, 0.70711f, 0.69636f, 1.0f };
-// does FFL even support anything other than sRGB lol?
-const int cGammaType = 1;
+
 const rio::BaseVec4f cLightColor = { 1.00f, 1.00f, 1.00f, 1.00f };
 
 }
@@ -600,7 +604,7 @@ void Shader::bind(bool light_enable, FFLCharModel* pCharModel)
     mShader.setUniform(light_enable, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_ENABLE]);
 
     //mShader.setUniform(s32(0), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_PAD0]);
-    mShader.setUniform(cGammaType, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_GAMMA_TYPE]);
+    mShader.setUniform(sGammaType, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_GAMMA_TYPE]);
     mShader.setUniform(cLightDir, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_DIR_IN_VIEW]);
     mShader.setUniform(cLightColor, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_COLOR]);
 

@@ -42,6 +42,7 @@ vec4 _pixelTmp;
 
 void main()
 {
+    //if (gl_FragCoord.z > 0.98593) discard;
     stackIdxVar = 0;
     stateVar = 0;
     RVar[0u] = PARAM_0;

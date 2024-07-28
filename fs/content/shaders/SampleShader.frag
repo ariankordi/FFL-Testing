@@ -16,6 +16,7 @@ VARYING_QUALIFIER Varying
 
 layout( location = 0 ) out vec4 o_Color;
 
+// NOTE: NOT SURE HOW TO SET UNIFORM BLOCKS IN RIO
 //layout( std140 ) uniform u_Modulate
 //{
     uniform int  modulateType;
@@ -30,10 +31,10 @@ layout( location = 0 ) out vec4 o_Color;
     uniform vec4 u_SssColor;
     uniform vec4 u_SpecularColor;
     uniform vec4 u_RimColor;
-    
+
     uniform float u_HalfLambertFactor;
     uniform float u_SssSpecularFactor;
-    
+
     uniform float u_SpecularFactorA;
     uniform float u_SpecularFactorB;
     uniform float u_SpecularShinness;
@@ -149,13 +150,6 @@ void main()
     }
 
     vec3 preNormal = In.normal;
-    // HACK: INJECT NORMALS INTO GLASS MESH
-    /*if(modulateType == MODULATE_TYPE_GLASS)
-    {
-        preNormal = vec3(-0.10568, -0.70254, 0.70254);
-        if(In.texCoord.x == 2.0) preNormal.x *= -1;
-        if(In.texCoord.y == 1.0) preNormal.y *= -1;
-    }*/
 
     /// ライティング向け計算
     vec3 normal = normalize(preNormal); ///< ビュー空間法線

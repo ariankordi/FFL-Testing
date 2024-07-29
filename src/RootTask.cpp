@@ -251,7 +251,7 @@ void RootTask::prepare_()
     #endif // RIO_IS_WIN (socket)
 
     // Set window aspect ratio, so that when resizing it will not change
-    #ifdef RIO_IS_WIN
+    #if RIO_IS_WIN
         GLFWwindow* glfwWindow = rio::Window::instance()->getNativeWindow().getGLFWwindow();
         glfwSetWindowAspectRatio(glfwWindow, window->getWidth(), window->getHeight());
     #endif // RIO_IS_WIN
@@ -285,8 +285,10 @@ void RootTask::createModel_() {
         modelSource.dataSource = FFL_DATA_SOURCE_DEFAULT;
         // guest miis are defined in FFLiDatabaseDefault.cpp
         // fetched from m_MiiDataOfficial, derived from the static array MII_DATA_CORE_RFL
+    #endif
         modelSource.index = mMiiCounter;
         modelSource.pBuffer = NULL;
+    #if !RIO_IS_CAFE
     }
     #endif
 

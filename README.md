@@ -3,17 +3,16 @@
 1. Follow the usual instructions below to get this up and running.
     * I don't think the server portion will work at all on a Wii U, so don't try.
     * Get to the point where it shows you spinny Miis.
-2. Go into `nwf body png` and run the script: `convert pngs to rgba raw.sh`
-    * Needs ffmpeg. Unless you want to do it your own way.
-3. Run either the Python or the Go server.
+2. Run either the Python or the Go server.
     * Python
         - Needs Flask
         - Run `june-server-tests/2024-06-19-ffl-testing-faceonly-proto.py`
     * Go
         - Inside `june-server-tests` just `go run .` or run the Go file
-4. Make sure FFL-Testing is running and listening, and try a request like this to the server: http://localhost:5000/miis/image.png?data=005057676b5258664e5364696a7477818e89969e9ea5b5bb9599a1b1a1a8dacdd3daddcdd0cad2d3e5e8ef060d1417&width=512
-5. If that works then run you probably want to run ffl_testing_2_debug64 with the `SERVER_ONLY` environment variable: `SERVER_ONLY=1 ./ffl_testing_2_debug64`
-6. Jon Pretendo if you are reading please return my 65 inch 4k ultra hd apple tv with dolby vision
+3. Make sure FFL-Testing is running and listening, and try a request like this to the server: http://localhost:5000/miis/image.png?data=005057676b565c6278819697bbc3cecad3e6edf301080a122e303a381c235f4a52595c4e51494f585c5f667d848b96&width=512
+4. If that works then run you probably want to run ffl_testing_2_debug64 with the `SERVER_ONLY` environment variable: `SERVER_ONLY=1 ./ffl_testing_2_debug64`
+    - This will hide the window and pause the program when it's not actively rendering.
+5. Jon Pretendo if you are reading please return my 65 inch 4k ultra hd apple tv with dolby vision
     - **(IMPORTANT IMPORTANT IF YOU ARE PRETENDO STAFF: PLEASE READ THE LICENSE, THANKS)**
 
 # Running FFL-Testing

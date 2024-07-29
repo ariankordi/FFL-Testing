@@ -76,7 +76,7 @@ void Model::drawXlu(const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj
 void Model::setViewUniform_(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx)
 {
     RIO_ASSERT(mpShader);
-    mpShader->bind(mLightEnable);
+    mpShader->bind(mLightEnable, &reinterpret_cast<FFLiCharModel*>(mpCharModel)->charInfo);
     mpShader->setViewUniform(model_mtx, view_mtx, proj_mtx);
 }
 
@@ -175,11 +175,11 @@ bool Model::initializeCpu_()
     return true;
 }
 
-void Model::initializeGpu_(const Shader& shader)
+void Model::initializeGpu_(Shader& shader)
 {
     mpShader = &shader;
     // disable light when rendering faceline textures
-    mpShader->bind(false);
+    mpShader->bind(false, &reinterpret_cast<FFLiCharModel*>(mpCharModel)->charInfo);
     FFLInitCharModelGPUStep(mpCharModel);
     //rio::Window::instance()->makeContextCurrent();
 }

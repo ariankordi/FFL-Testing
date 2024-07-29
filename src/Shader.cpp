@@ -251,6 +251,8 @@ Shader::~Shader()
 
 void Shader::initialize()
 {
+    mBodyShader.load("FFLBodyShader");
+
     mShader.load("FFLShader", rio::Shader::MODE_UNIFORM_REGISTER);
 
     mVertexUniformLocation[VERTEX_UNIFORM_IT]   = mShader.getVertexUniformLocation("u_it");
@@ -338,8 +340,9 @@ void Shader::initialize()
     FFLSetShaderCallback(&mCallback);
 }
 
-void Shader::bind(bool light_enable) const
+void Shader::bind(bool light_enable, FFLiCharInfo* pCharInfo)
 {
+    mpCharInfo = pCharInfo;
     mShader.bind();
 #if RIO_IS_CAFE
     GX2SetFetchShader(&mFetchShader);
@@ -378,6 +381,20 @@ void Shader::setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx
         it34.m[0][2], it34.m[1][2], it34.m[2][2]
     };
     mShader.setUniformColumnMajor(it, mVertexUniformLocation[VERTEX_UNIFORM_IT], u32(-1));
+}
+
+void Shader::setViewUniformBody(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const {
+    mBodyShader.setUniform(proj_mtx, mBodyShader.getVertexUniformLocation("proj"), u32(-1));
+
+    rio::Matrix44f view44;
+    view44.fromMatrix34(view_mtx);
+
+    mBodyShader.setUniform(view44, mBodyShader.getVertexUniformLocation("view"), u32(-1));
+
+    rio::Matrix44f model44;
+    model44.fromMatrix34(model_mtx);
+
+    mBodyShader.setUniform(model44, mBodyShader.getVertexUniformLocation("world"), u32(-1));
 }
 
 void Shader::applyAlphaTest(bool enable, rio::Graphics::CompareFunc func, f32 ref) const
@@ -470,28 +487,58 @@ void Shader::setModulate_(const FFLModulateParam& modulateParam)
     bindTexture_(modulateParam);
 }
 
-void Shader::setMaterial_(const FFLDrawParam& drawParam)
+void Shader::setMaterial_(const FFLModulateType modulateType)
 {
-    if (drawParam.modulateParam.type >= cMaterialParamSize)
+    if (modulateType >= cMaterialParamSize)
         return;
 
-    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].ambient), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_AMBIENT]);
-    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].diffuse), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_DIFFUSE]);
-    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].specular), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR]);
-    mShader.setUniform(cMaterialParam[drawParam.modulateParam.type].specularPower, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER]);
+    mShader.setUniform(getColorUniform(cMaterialParam[modulateType].ambient), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_AMBIENT]);
+    mShader.setUniform(getColorUniform(cMaterialParam[modulateType].diffuse), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_DIFFUSE]);
+    mShader.setUniform(getColorUniform(cMaterialParam[modulateType].specular), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR]);
+    mShader.setUniform(cMaterialParam[modulateType].specularPower, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER]);
+}
 
-    s32 materialSpecularMode = cMaterialParam[drawParam.modulateParam.type].specularMode;
-    if (drawParam.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT].ptr == nullptr)
-        materialSpecularMode = 0;
+void Shader::bindBodyShader(FFLiCharInfo* pCharInfo)
+{
+    mBodyShader.bind();
+    //RIO_GL_CALL(glBindVertexArray(vao));
 
-    mShader.setUniform(materialSpecularMode, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE]);
+    setCulling(FFL_CULL_MODE_BACK);
+
+    // set body uniforms
+    // not the nwf light direction but eh
+    mBodyShader.setUniform(cLightDir.x, cLightDir.y, cLightDir.z, 0.0f, mBodyShader.getVertexUniformLocation("lightDir"), u32(-1));
+
+
+    mBodyShader.setUniform(3.0f, u32(-1), mBodyShader.getFragmentUniformLocation("SP_power"));
+    mBodyShader.setUniform(0.7f, 0.7f, 0.7f, u32(-1), mBodyShader.getFragmentUniformLocation("ambient"));
+    // FAVORITE COLOR
+    const FFLColor favoriteColor = FFLGetFavoriteColor(pCharInfo->favoriteColor);
+    mBodyShader.setUniform(favoriteColor.r, favoriteColor.g, favoriteColor.b, u32(-1), mBodyShader.getFragmentUniformLocation("base"));
+
+    mBodyShader.setUniform(0.3f, 0.3f, 0.3f, u32(-1), mBodyShader.getFragmentUniformLocation("diffuse"));
+    mBodyShader.setUniform(0.4f, 0.4f, 0.4f, u32(-1), mBodyShader.getFragmentUniformLocation("rim"));
+    mBodyShader.setUniform(2.0f, u32(-1), mBodyShader.getFragmentUniformLocation("rimSP_power"));
+    mBodyShader.setUniform(0.17f, 0.17f, 0.17f, u32(-1), mBodyShader.getFragmentUniformLocation("specular"));
+    mBodyShader.setUniform(u32(7), u32(-1), mBodyShader.getFragmentUniformLocation("PS_PUSH.alphaFunc"));
+    mBodyShader.setUniform(0.0f, u32(-1), mBodyShader.getFragmentUniformLocation("PS_PUSH.alphaRef"));
 }
 
 void Shader::draw_(const FFLDrawParam& draw_param)
 {
     setCulling(draw_param.cullMode);
     setModulate_(draw_param.modulateParam);
-    setMaterial_(draw_param);
+    const FFLModulateType modulateType = draw_param.modulateParam.type;
+    setMaterial_(modulateType);
+
+    // moved from setMaterial_ to here, set material specular mode
+    if (modulateType < cMaterialParamSize) {
+        s32 materialSpecularMode = cMaterialParam[modulateType].specularMode;
+        // if there's no tangent then set specular mode to 0
+        if (draw_param.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT].ptr == nullptr)
+            materialSpecularMode = 0;
+        mShader.setUniform(materialSpecularMode, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE]);
+    }
 
     if (draw_param.primitiveParam.pIndexBuffer != nullptr)
     {

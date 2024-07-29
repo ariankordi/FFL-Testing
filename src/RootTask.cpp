@@ -57,7 +57,7 @@ int addrlen = sizeof(address);
 //rio::mdl::res::Model* bodyResModels[FFL_GENDER_MAX];
 const rio::mdl::Model* bodyModels[FFL_GENDER_MAX];
 
-rio::Shader bodyShader;
+#include <mii_ext_MiiPort.h>
 
 void RootTask::prepare_()
 {
@@ -169,7 +169,7 @@ void RootTask::prepare_()
         // Create perspective projection instance
         rio::PerspectiveProjection proj(
             500.0f, // Near
-            700.0f, // Far
+            1200.0f, // Far
             fovy,// * 1.6f, // fovy
             aspect // Aspect ratio
         );
@@ -195,15 +195,19 @@ void RootTask::prepare_()
     // Check if the folder exists
     if (std::filesystem::exists(folderPath) && std::filesystem::is_directory(folderPath)) {
         for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
-            if (entry.is_regular_file() && entry.file_size() == sizeof(FFLStoreData)) {
+            if (entry.is_regular_file()
+                && entry.file_size() >= sizeof(charInfoStudio)
+                && entry.path().filename().string().at(0) != '.')
+            {
                 // Read the file content
                 std::ifstream file(entry.path(), std::ios::binary);
                 if (file.is_open()) {
-                    FFLStoreData data;
-                    file.read(reinterpret_cast<char*>(&data), sizeof(FFLStoreData));
-                    if (file.gcount() == sizeof(FFLStoreData)) {
+                    std::vector<char> data;
+                    data.resize(entry.file_size());
+                    file.read(&data[0], entry.file_size());
+                    //if (file.gcount() == sizeof(FFLStoreData)) {
                         mStoreDataArray.push_back(data);
-                    }
+                    //}
                     file.close();
                 }
             }
@@ -299,7 +303,7 @@ void RootTask::prepare_()
         bodyModels[i] = new rio::mdl::Model(resModel);
     }
     //RIO_ASSERT(loadBodyGLTF(&gltfBodyModel, bodyGltfMaleFilename));
-    bodyShader.load("FFLBodyShader");
+    //bodyShader.load("FFLBodyShader");
 
     mInitialized = true;
 }
@@ -308,6 +312,9 @@ void RootTask::prepare_()
 // default source only has 6
 // GetMiiDataNum()
 int maxMiis = 6;
+
+// forward declaration
+bool pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, int dataLength, RenderRequest *buf);
 
 void RootTask::createModel_() {
     FFLCharModelSource modelSource;
@@ -318,11 +325,21 @@ void RootTask::createModel_() {
         modelSource.dataSource = FFL_DATA_SOURCE_OFFICIAL;
         // NOTE: will only use first 6 miis from mii maker database
     #else
+    FFLiCharInfo charInfo;
     if (!mStoreDataArray.empty()) {
         // Use the custom Mii data array
+        if(!pickupCharInfoFromRenderRequest(&charInfo, mStoreDataArray[mMiiCounter].size(), reinterpret_cast<RenderRequest*>(&mStoreDataArray[mMiiCounter][0])))
+        {
+            RIO_LOG("pickupCharInfoFromRenderRequest returned false on Mii counter: %d\n", mMiiCounter);
+            mpModel = nullptr;
+            mCounter = 0.0f;
+            mMiiCounter = (mMiiCounter + 1) % maxMiis;
+            return;
+        }
+
         modelSource.index = 0;
-        modelSource.dataSource = FFL_DATA_SOURCE_STORE_DATA;
-        modelSource.pBuffer = &mStoreDataArray[mMiiCounter];
+        modelSource.dataSource = FFL_DATA_SOURCE_DIRECT_POINTER;
+        modelSource.pBuffer = &charInfo;
         // limit current counter by the amount of custom miis
         maxMiis = mStoreDataArray.size();
     } else {
@@ -356,19 +373,17 @@ void RootTask::createModel_() {
     if (!mpModel->initialize(arg, mShader)) {
         delete mpModel;
         mpModel = nullptr;
-    } else {
+    } /*else {
         mpModel->setScale({ 1.f, 1.f, 1.f });
         //mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
-    }
+    }*/
     mCounter = 0.0f;
 }
 
-#include <mii_ext_MiiPort.h>
-
-void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf) {
+bool pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, int dataLength, RenderRequest *buf) {
     MiiDataInputType inputType;
 
-    switch (buf->dataLength) {
+    switch (dataLength) {
         /*case sizeof(FFLStoreData):
         case sizeof(FFLiMiiDataOfficial):
         case sizeof(FFLiMiiDataCore):
@@ -390,8 +405,15 @@ void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf
         case 48: // studio encoded i think
             inputType = INPUT_TYPE_STUDIO_ENCODED;
             break;
-        default:
+        case sizeof(FFLiMiiDataCore):
+        case sizeof(FFLiMiiDataOfficial):
+        case sizeof(FFLStoreData):
             inputType = INPUT_TYPE_FFL_MIIDATACORE;
+            break;
+        default:
+            // uh oh, we can't detect it
+            return false;
+            break;
     }
 
     switch (inputType) {
@@ -457,9 +479,14 @@ void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf
         {
             // mii studio url data format is obfuscated
             // this decodes it in place and falls through
-            studioURLObfuscationDecode(buf->data);
+            char decodedData[48];
+            std::memcpy(decodedData, buf->data, dataLength);
+            studioURLObfuscationDecode(decodedData);
+            charInfo charInfoNX;
+            studioToCharInfoNX(&charInfoNX, reinterpret_cast<::charInfoStudio*>(decodedData));
+            charInfoNXToFFLiCharInfo(pCharInfo, &charInfoNX);
+            break;
         }
-        // NOTE: FALL THROUGH AND DECODE BUF AS RAW STUDIO DATA....
         case INPUT_TYPE_STUDIO_RAW:
             // we may not need this if we decode from and to buf->data but that's confusing
             charInfo charInfoNX;
@@ -469,6 +496,7 @@ void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf
         case INPUT_TYPE_NX_CHARINFO:
             charInfoNXToFFLiCharInfo(pCharInfo, reinterpret_cast<::charInfo*>(buf->data));
             break;
+        // note this is miidatacore
         default:
             // TODO: SWAP ENDIAN ON WII U OR HANDLE BOTH KINDS
             FFLiMiiDataCore2CharInfo(pCharInfo,
@@ -477,17 +505,18 @@ void pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, RenderRequest *buf
             NULL, false);
             break;
     }
+    return true;
 }
 
 void RootTask::createModel_(RenderRequest *buf) {
     FFLiCharInfo charInfo;
 
-    /*if (!*/pickupCharInfoFromRenderRequest(&charInfo, buf);/*) {
-        RIO_LOG("pickupCharInfoFromReqBuf returned false\n");
+    if (!pickupCharInfoFromRenderRequest(&charInfo, buf->dataLength, buf)) {
+        RIO_LOG("pickupCharInfoFromRenderRequest returned false\n");
         mpModel = nullptr;
         mCounter = 0.0f;
         return;
-    }*/
+    }
 
     // VERIFY CHARINFO
     if (buf->verifyCharInfo) {
@@ -541,10 +570,10 @@ void RootTask::createModel_(RenderRequest *buf) {
     mCounter = 0.0f;
 }
 
-void RootTask::drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, rio::BaseMtx44f& proj_mtx) {
+void RootTask::drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx) {
 
     // SELECT BODY MODEL
-    const rio::mdl::Model* model = bodyModels[gender];
+    const rio::mdl::Model* model = bodyModels[charInfo->gender];
 
     const rio::mdl::Mesh* const meshes = model->meshes();
 
@@ -554,14 +583,9 @@ void RootTask::drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, r
         const rio::mdl::Mesh& mesh = meshes[i];
 
         // BIND SHADER
-        bodyShader.bind();
+        //bodyShader.bind();
+        mShader.bindBodyShader(charInfo);
         //RIO_GL_CALL(glBindVertexArray(vao));
-
-        // set body uniforms
-        // not the nwf light direction but eh
-        bodyShader.setUniform(-0.4531539381f, 0.4226179123f, 0.7848858833f, 0.0f, bodyShader.getVertexUniformLocation("lightDir"), u32(-1));
-        bodyShader.setUniform(proj_mtx, bodyShader.getVertexUniformLocation("proj"), u32(-1));
-
 
         rio::BaseMtx34f view_mtx;
         /*rio::LookAtCamera camera;
@@ -570,31 +594,22 @@ void RootTask::drawMiiBodyREAL(const FFLColor favoriteColor, FFLGender gender, r
         camera.setUp({ 0.0f, 1.0f, 0.0f });
         camera.getMatrix(&view_mtx);
         */
-        mCamera.at() = { mCamera.at().x, mCamera.at().y + 93.32f, mCamera.at().z };
-        mCamera.pos() = { mCamera.pos().x, mCamera.pos().y + 93.32f, mCamera.pos().z };
+
+
+        float bodyHeightOffset = 93.92f;
+
+        mCamera.at() = { mCamera.at().x, mCamera.at().y + bodyHeightOffset, mCamera.at().z };
+        mCamera.pos() = { mCamera.pos().x, mCamera.pos().y + bodyHeightOffset, mCamera.pos().z };
         mCamera.getMatrix(&view_mtx);
 
-        rio::Matrix44f view44;
-        view44.fromMatrix34(view_mtx);
 
-        bodyShader.setUniform(view44, bodyShader.getVertexUniformLocation("view"), u32(-1));
-        bodyShader.setUniform(rio::Matrix44f::ident, bodyShader.getVertexUniformLocation("world"), u32(-1));
-
-
-        bodyShader.setUniform(3.0f, u32(-1), bodyShader.getFragmentUniformLocation("SP_power"));
-        bodyShader.setUniform(0.7f, 0.7f, 0.7f, u32(-1), bodyShader.getFragmentUniformLocation("ambient"));
-        // FAVORITE COLOR
-        bodyShader.setUniform(favoriteColor.r, favoriteColor.g, favoriteColor.b, u32(-1), bodyShader.getFragmentUniformLocation("base"));
-
-        bodyShader.setUniform(0.3f, 0.3f, 0.3f, u32(-1), bodyShader.getFragmentUniformLocation("diffuse"));
-        bodyShader.setUniform(0.4f, 0.4f, 0.4f, u32(-1), bodyShader.getFragmentUniformLocation("rim"));
-        bodyShader.setUniform(2.0f, u32(-1), bodyShader.getFragmentUniformLocation("rimSP_power"));
-        bodyShader.setUniform(0.17f, 0.17f, 0.17f, u32(-1), bodyShader.getFragmentUniformLocation("specular"));
-        bodyShader.setUniform(u32(7), u32(-1), bodyShader.getFragmentUniformLocation("PS_PUSH.alphaFunc"));
-        bodyShader.setUniform(0.0f, u32(-1), bodyShader.getFragmentUniformLocation("PS_PUSH.alphaRef"));
+        mShader.setViewUniformBody(rio::Matrix34f::ident, view_mtx, proj_mtx);
 
         // finally, the uniforms are all set
 
+        rio::RenderState render_state;
+        render_state.setCullingMode(rio::Graphics::CULLING_MODE_BACK);
+        render_state.applyCullingAndPolygonModeAndPolygonOffset();
         mesh.draw();
     }
     //bodyShader.unload();
@@ -625,8 +640,8 @@ void RootTask::handleRenderRequest(char* buf, rio::BaseMtx34f view_mtx) {
         // if it has body then use the matrix we just defined
         projMtx = mProjMtxIconBody;
         // FFLMakeIconWithBody view
-        mCamera.pos() = { 0.0f, 37.05f, 415.53f };
-        mCamera.at() = { 0.0f, 37.05f, 0.0f };
+        mCamera.pos() = { 0.0f, 34.20f, 412.0f };
+        mCamera.at() = { 0.0f, 34.20f, 0.0f };
         mCamera.setUp({ 0.0f, 1.0f, 0.0f });
         mCamera.getMatrix(&view_mtx);
         // without this it will use the default view matrix
@@ -702,6 +717,13 @@ RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RE
 */
     RIO_LOG("Render buffer bound.\n");
 
+    //if (gl_FragCoord.z > 0.98593) discard;
+    // Enable depth testing
+    /*glEnable(GL_DEPTH_TEST);
+    // Set the depth function to discard fragments with depth values greater than the threshold
+    glDepthFunc(GL_GREATER);
+    glDepthRange(0.98593f, 0.f);
+*/
     // Render the first frame to the buffer
     mpModel->drawOpa(view_mtx, *projMtx);
     RIO_LOG("drawOpa rendered to the buffer.\n");
@@ -709,16 +731,10 @@ RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RE
     // draw body?
     if (!renderRequest->isHeadOnly)
     {
-        // i think this is black
-        int favoriteColorIndex = 11;
         FFLiCharModel *charModel = reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel());
 
-        if (charModel->charInfo.favoriteColor < FFL_FAVORITE_COLOR_MAX)
-            favoriteColorIndex = charModel->charInfo.favoriteColor;
-
-        const FFLColor favoriteColor = FFLGetFavoriteColor(favoriteColorIndex);
         //drawMiiBodyFAKE(renderTextureColor, renderTextureDepth, favoriteColorIndex);
-        drawMiiBodyREAL(favoriteColor, charModel->charInfo.gender,  *projMtx);
+        drawMiiBodyREAL(&charModel->charInfo,  *projMtx);
     }
 
     renderBuffer.bind();
@@ -952,7 +968,7 @@ void RootTask::calc_()
     #endif
 
     // Distance in the XZ-plane from the center to the camera position
-    static const float radius = 600.0f;
+    float radius = 600.0f;
     // Define a constant position in the 3D space for the center position of the camera
     static const rio::Vector3f CENTER_POS = { 0.0f, 34.5f, radius };
     static const rio::Vector3f target = { 0.0f, 34.5f, 0.0f };
@@ -963,13 +979,15 @@ void RootTask::calc_()
     // Define the radius of the orbit in the XZ-plane (distance from the target)
     const char* noSpin = getenv("NO_SPIN");
     if (!noSpin && !mServerOnly) {
+        radius += 470;
         mCamera.pos().set(
             // Set the camera's position using the sin and cos functions to move it in a circle around the target
             std::sin(mCounter) * radius,
-            CENTER_POS.y * std::sin(mCounter) * 7.5,
+            CENTER_POS.y * std::sin(mCounter) * 7.5 - 40,
             // Add a minus sign to the cosine to spin CCW (same as SpinMii)
             std::cos(mCounter) * radius
         );
+        mCamera.at() = { target.x, target.y - 40, target.z };
     } else {
         mCamera.pos() = CENTER_POS;
     }
@@ -994,10 +1012,8 @@ void RootTask::calc_()
 
     if (mpModel != nullptr) {
         mpModel->enableSpecialDraw();
-        FFLiCharInfo charInfo = reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel())->charInfo;
-
         mpModel->drawOpa(view_mtx, mProjMtx);
-        drawMiiBodyREAL(FFLGetFavoriteColor(charInfo.favoriteColor), charInfo.gender, mProjMtx);
+        drawMiiBodyREAL(&reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel())->charInfo, mProjMtx);
         mpModel->drawXlu(view_mtx, mProjMtx);
     }
 }
@@ -1016,6 +1032,8 @@ void RootTask::exit_()
     if (mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] != 0) {
       rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE]);
     }
+
+    delete mProjMtxIconBody;
 
     mInitialized = false;
 }

@@ -25,7 +25,7 @@ public:
     ~Model();
 
     template <typename T>
-    bool initialize(const InitArg<T>& arg, const Shader& shader);
+    bool initialize(const InitArg<T>& arg, Shader& shader);
 
     FFLCharModel* getCharModel() const { return mpCharModel; }
     FFLResult getInitializeCpuResult() const { return mInitializeCpuResult; }
@@ -75,7 +75,7 @@ private:
 
     void initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource* p_source);
     bool initializeCpu_();
-    void initializeGpu_(const Shader& shader);
+    void initializeGpu_(Shader& shader);
 
 private:
     FFLCharModel*       mpCharModel;
@@ -84,7 +84,7 @@ private:
     rio::BaseMtx34f     mMtxRT;
     rio::BaseVec3f      mScale;
     rio::BaseMtx34f     mMtxSRT;
-    const Shader*       mpShader;
+    Shader*             mpShader;
     bool                mLightEnable;
     bool                mIsEnableSpecialDraw;
     bool                mIsInitialized;
@@ -92,7 +92,7 @@ private:
 };
 
 template <typename T>
-bool Model::initialize(const InitArg<T>& arg, const Shader& shader)
+bool Model::initialize(const InitArg<T>& arg, Shader& shader)
 {
     RIO_ASSERT(mIsInitialized == false);
 

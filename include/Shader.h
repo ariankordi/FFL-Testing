@@ -17,9 +17,12 @@ public:
 
     void initialize();
 
-    void bind(bool light_enable) const;
+    void bind(bool light_enable, FFLiCharInfo* charInfo);
+
+    void bindBodyShader(FFLiCharInfo* pCharInfo);
 
     void setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const;
+    void setViewUniformBody(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const;
 
     void applyAlphaTestEnable() const
     {
@@ -43,7 +46,7 @@ private:
     void setModulateMode_(FFLModulateMode mode);
     void setModulate_(const FFLModulateParam& modulateParam);
 
-    void setMaterial_(const FFLDrawParam& drawParam);
+    void setMaterial_(const FFLModulateType modulateType);
 
     void draw_(const FFLDrawParam& draw_param);
     static void drawCallback_(void* p_obj, const FFLDrawParam& draw_param);
@@ -82,6 +85,7 @@ private:
     };
 
     rio::Shader             mShader;
+    rio::Shader             mBodyShader;
     s32                     mVertexUniformLocation[VERTEX_UNIFORM_MAX];
     s32                     mPixelUniformLocation[PIXEL_UNIFORM_MAX];
     s32                     mSamplerLocation;
@@ -95,4 +99,5 @@ private:
 #endif
     FFLShaderCallback       mCallback;
     rio::TextureSampler2D   mSampler;
+    FFLiCharInfo*           mpCharInfo;
 };

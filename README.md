@@ -1,3 +1,4 @@
+**(IMPORTANT IMPORTANT IF YOU ARE PRETENDO STAFF: PLEASE READ THE LICENSE, THANKS)**
 # RENDERER SERVER PROTOTYPE!!!!!!!!!!!!!! 😍
 1. Follow the usual instructions below to get this up and running.
     * I don't think the server portion will work at all on a Wii U, so don't try.
@@ -13,7 +14,7 @@
 4. Make sure FFL-Testing is running and listening, and try a request like this to the server: http://localhost:5000/miis/image.png?data=005057676b5258664e5364696a7477818e89969e9ea5b5bb9599a1b1a1a8dacdd3daddcdd0cad2d3e5e8ef060d1417&width=512
 5. If that works then run you probably want to run ffl_testing_2_debug64 with the `SERVER_ONLY` environment variable: `SERVER_ONLY=1 ./ffl_testing_2_debug64`
 6. Jon Pretendo if you are reading please return my 65 inch 4k ultra hd apple tv with dolby vision
-    * seriously fix my account please I won't make a new nasc account with a malformed serial number again 😔 😔 😔 😔 😔 https://discord.com/channels/408718485913468928/1236115730869649489/1236115730869649489
+    - **(IMPORTANT IMPORTANT IF YOU ARE PRETENDO STAFF: PLEASE READ THE LICENSE, THANKS)**
 
 # Running FFL-Testing
 As of 2024-05-31, I added a Makefile that should more or less "just" work on Linux, or Windows if you have MSYS2.
@@ -40,7 +41,7 @@ As of 2024-05-31, I added a Makefile that should more or less "just" work on Lin
     ```
     make -j4
     ```
-    To build with WUT, use: `make -f Makefile.wut -j4`
+    To build with WUT, use: `make wut -j4`
 3. Obtain required files.
     * You'll need to extract the following file from a Wii U:
         - `sys/title/0005001b/10056000/content/FFLResHigh.dat`

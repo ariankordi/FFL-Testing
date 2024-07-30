@@ -8,10 +8,6 @@
 // for markCommonColor
 #include <nn/ffl/FFLiColor.h>
 
-// NOTE: TAKEN FROM MiiPort/include/convert_mii.h
-// only conversion table we need from MiiPort
-const u8 ToVer3GlassTypeTable[20] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 1, 3, 7, 7, 6, 7, 8, 7, 7};
-
 void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     // Initialize the destination structure
     rio::MemUtil::set(dest, 0, sizeof(FFLiCharInfo));
@@ -54,10 +50,10 @@ void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     dest->parts.mustacheScale = src->mustache_scale;
     dest->parts.mustachePositionY = src->mustache_y;
 
-    //dest->parts.glassType = src->glass_type;
+    dest->parts.glassType = src->glass_type;
     // Glass type special case
-    // NOTE: NEED TO IMPORT SWITCH/MIITOMO 2.3.0 GLASS TYPE TEXTURES
-    dest->parts.glassType = ToVer3GlassTypeTable[src->glass_type];
+    //dest->parts.glassType = ToVer3GlassTypeTable[src->glass_type];
+    // NOTE: glass type mapping has been moved to FFLiResourceLoader.cpp
 
     dest->parts.glassColor = markCommonColor(src->glass_color);
     dest->parts.glassScale = src->glass_scale;
@@ -71,8 +67,7 @@ void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src) {
     dest->height = src->height;
     dest->build = src->build;
     rio::MemUtil::copy(dest->name, src->nickname, sizeof(src->nickname));
-    // NOTE: not sure if this is accurate
-    dest->gender = static_cast<FFLGender>((src->gender <= 1) ? src->gender : FFL_GENDER_MAX);
+    dest->gender = static_cast<FFLGender>(u32(src->gender));
     dest->favoriteColor = src->favorite_color;
     // no equivalent for favoriteMii
     dest->regionMove = src->region_move;

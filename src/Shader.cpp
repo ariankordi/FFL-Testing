@@ -337,6 +337,11 @@ void Shader::initialize()
     mCallback.pApplyAlphaTestFunc = &Shader::applyAlphaTestCallback_;
     mCallback.pDrawFunc = &Shader::drawCallback_;
     mCallback.pSetMatrixFunc = &Shader::setMatrixCallback_;
+    setShaderCallback_();
+}
+
+void Shader::setShaderCallback_()
+{
     FFLSetShaderCallback(&mCallback);
 }
 
@@ -344,6 +349,7 @@ void Shader::bind(bool light_enable, FFLiCharInfo* pCharInfo)
 {
     mpCharInfo = pCharInfo;
     mShader.bind();
+    setShaderCallback_();
 #if RIO_IS_CAFE
     GX2SetFetchShader(&mFetchShader);
 #elif RIO_IS_WIN

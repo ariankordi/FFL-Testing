@@ -595,15 +595,44 @@ void RootTask::drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx
         camera.getMatrix(&view_mtx);
         */
 
+        rio::BaseVec3f scaleFactors;
 
-        float bodyHeightOffset = 93.92f;
+        float build = charInfo->build;
+        float height = charInfo->height;
+
+        // "calculateScaleFactors" anonymous function referenced in nn::mii::detail::VariableIconBodyImpl::CalculateWorldMatrix
+        /*scaleFactors.x = (build * (height * 0.003671875f + 0.4f)) / 128.0f +
+                        height * 0.001796875f + 0.4f;//0.4f;
+
+        scaleFactors.y = (height * 0.006015625f) + 0.5f;
+*/
+        // WII U FACTORS?
+        scaleFactors.y = height / 128.0f;
+        scaleFactors.x = scaleFactors.y * 0.3f + 0.6f;
+        scaleFactors.x = ((scaleFactors.y * 0.6f + 0.8f) - scaleFactors.x) * build / 128.0f + scaleFactors.x;
+
+        scaleFactors.y = scaleFactors.y * 0.55f + 0.6f;
+
+        scaleFactors.z = scaleFactors.x;
+
+        // Ensure scaleFactors.y is clamped to a maximum of 1.0
+        scaleFactors.y = std::min(scaleFactors.y, 1.0f);
+
+
+        float bodyHeightOffset = scaleFactors.y * 93.92f;
 
         mCamera.at() = { mCamera.at().x, mCamera.at().y + bodyHeightOffset, mCamera.at().z };
         mCamera.pos() = { mCamera.pos().x, mCamera.pos().y + bodyHeightOffset, mCamera.pos().z };
         mCamera.getMatrix(&view_mtx);
 
 
-        mShader.setViewUniformBody(rio::Matrix34f::ident, view_mtx, proj_mtx);
+        // Create the scale matrix
+        rio::BaseMtx34f model_mtx = rio::Matrix34f::ident;
+        model_mtx.m[0][0] = scaleFactors.x; // Scale x-axis
+        model_mtx.m[1][1] = scaleFactors.y; // Scale y-axis
+        model_mtx.m[2][2] = scaleFactors.z; // Scale z-axis
+
+        mShader.setViewUniformBody(model_mtx, view_mtx, proj_mtx);
 
         // finally, the uniforms are all set
 
@@ -639,7 +668,8 @@ void RootTask::handleRenderRequest(char* buf, rio::BaseMtx34f view_mtx) {
     } else {
         // if it has body then use the matrix we just defined
         projMtx = mProjMtxIconBody;
-        // FFLMakeIconWithBody view
+        // NOTE: adjusted to be slightly more accurate but still not right
+        // FFLMakeIconWithBody view uses 37.05f, 415.53f
         mCamera.pos() = { 0.0f, 34.20f, 412.0f };
         mCamera.at() = { 0.0f, 34.20f, 0.0f };
         mCamera.setUp({ 0.0f, 1.0f, 0.0f });
@@ -979,15 +1009,15 @@ void RootTask::calc_()
     // Define the radius of the orbit in the XZ-plane (distance from the target)
     const char* noSpin = getenv("NO_SPIN");
     if (!noSpin && !mServerOnly) {
-        radius += 470;
+        radius += 380;
         mCamera.pos().set(
             // Set the camera's position using the sin and cos functions to move it in a circle around the target
             std::sin(mCounter) * radius,
-            CENTER_POS.y * std::sin(mCounter) * 7.5 - 40,
+            CENTER_POS.y * std::sin(mCounter) * 7.5 - 30,
             // Add a minus sign to the cosine to spin CCW (same as SpinMii)
             std::cos(mCounter) * radius
         );
-        mCamera.at() = { target.x, target.y - 40, target.z };
+        mCamera.at() = { target.x, target.y - 30, target.z };
     } else {
         mCamera.pos() = CENTER_POS;
     }

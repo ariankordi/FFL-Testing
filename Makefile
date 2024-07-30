@@ -10,7 +10,7 @@ INCLUDES := -IninTexUtils/include -Irio/include -Iffl/include -Iinclude $(INCLUD
 # , where it can open the database and resource files
 # FFL_NO_OPEN_DATABASE makes sure it doesn't try to open the database by default if you don't need it
 # FFL_TEST_DISABLE_MII_COLOR_VERIFY is a testing option that allows you to use out of bound color values in CharInfo
-DEFS := -DFFL_MLC_PATH="\"./\"" -DRIO_DEBUG -DFFL_NO_OPEN_DATABASE -DFFL_TEST_DISABLE_MII_COLOR_VERIFY $(DEFS)
+DEFS := -DFFL_MLC_PATH="\"./\"" -DRIO_DEBUG -DRIO_NO_CONTROLLERS_WIN -DFFL_NO_OPEN_DATABASE -DFFL_NO_DRAW_MASK_TWICE -DFFL_TEST_DISABLE_MII_COLOR_VERIFY $(DEFS)
 
 # Binary name which you can change if you want
 EXEC := ffl_testing_2_debug64

@@ -1,44 +1,43 @@
 #pragma once
 
-#include <gpu/rio_Shader.h>
-#include <gpu/rio_TextureSampler.h>
+#include <IShader.h>
 
-#include <nn/ffl.h>
+#include <gpu/rio_TextureSampler.h>
 
 #if RIO_IS_CAFE
 #include <gx2/shaders.h>
 #endif // RIO_IS_CAFE
 
-class Shader
+class Shader : public IShader
 {
 public:
     Shader();
     ~Shader();
 
-    void initialize();
+    void initialize() override;
 
-    void bind(bool light_enable, FFLiCharInfo* charInfo);
+    void bind(bool light_enable, FFLiCharInfo* charInfo) override;
 
-    void bindBodyShader(FFLiCharInfo* pCharInfo);
+    void bindBodyShader(FFLiCharInfo* pCharInfo) override;
 
-    void setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const;
-    void setViewUniformBody(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const;
+    void setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const override;
+    void setViewUniformBody(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const override;
 
-    void applyAlphaTestEnable() const
+    void applyAlphaTestEnable() const override
     {
         applyAlphaTest(true, rio::Graphics::COMPARE_FUNC_GREATER, 0.0f);
     }
 
-    void applyAlphaTestDisable() const
+    void applyAlphaTestDisable() const override
     {
         applyAlphaTest(false, rio::Graphics::COMPARE_FUNC_ALWAYS, 0.0f);
     }
 
-    void applyAlphaTest(bool enable, rio::Graphics::CompareFunc func, f32 ref) const;
+    void applyAlphaTest(bool enable, rio::Graphics::CompareFunc func, f32 ref) const override;
 
     static void setCulling(FFLCullMode mode);
 
-private:
+protected:
     static void applyAlphaTestCallback_(void* p_obj, bool enable, rio::Graphics::CompareFunc func, f32 ref);
     void setShaderCallback_();
 
@@ -55,7 +54,7 @@ private:
     void setMatrix_(const rio::BaseMtx44f& matrix);
     static void setMatrixCallback_(void* p_obj, const rio::BaseMtx44f& matrix);
 
-private:
+protected:
     enum VertexUniform
     {
         VERTEX_UNIFORM_IT = 0,  // Inverse transpose of MV

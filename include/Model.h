@@ -4,7 +4,7 @@
 
 #include <nn/ffl.h>
 
-class Shader;
+#include <IShader.h>
 
 class Model
 {
@@ -25,9 +25,10 @@ public:
     ~Model();
 
     template <typename T>
-    bool initialize(const InitArg<T>& arg, Shader& shader);
+    bool initialize(const InitArg<T>& arg, IShader& shader);
 
     FFLCharModel* getCharModel() const { return mpCharModel; }
+    IShader* getShader() const { return mpShader; }
     FFLResult getInitializeCpuResult() const { return mInitializeCpuResult; }
 
     void enableSpecialDraw();
@@ -75,7 +76,7 @@ private:
 
     void initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource* p_source);
     bool initializeCpu_();
-    void initializeGpu_(Shader& shader);
+    void initializeGpu_(IShader& shader);
 
 private:
     FFLCharModel*       mpCharModel;
@@ -84,7 +85,7 @@ private:
     rio::BaseMtx34f     mMtxRT;
     rio::BaseVec3f      mScale;
     rio::BaseMtx34f     mMtxSRT;
-    Shader*             mpShader;
+    IShader*            mpShader;
     bool                mLightEnable;
     bool                mIsEnableSpecialDraw;
     bool                mIsInitialized;
@@ -92,7 +93,7 @@ private:
 };
 
 template <typename T>
-bool Model::initialize(const InitArg<T>& arg, Shader& shader)
+bool Model::initialize(const InitArg<T>& arg, IShader& shader)
 {
     RIO_ASSERT(mIsInitialized == false);
 

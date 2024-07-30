@@ -1,5 +1,5 @@
 #include <Model.h>
-#include <Shader.h>
+#include <IShader.h>
 
 #include <gfx/rio_Window.h>
 #include <gpu/rio_RenderState.h>
@@ -96,6 +96,8 @@ void Model::drawOpaNormal_()
     FFLDrawOpa(mpCharModel);
 }
 
+// NOTE: TODO?: YOU MAY WANT TO USE FFLDrawOpaWithCallback/FFLDrawXluWithCallback TO EXPLICITLY DECLARE WHICH SHADER TO USE / in a STATELESS manner
+
 void Model::drawOpaSpecial_()
 {
     RIO_ASSERT(mpShader);
@@ -175,7 +177,7 @@ bool Model::initializeCpu_()
     return true;
 }
 
-void Model::initializeGpu_(Shader& shader)
+void Model::initializeGpu_(IShader& shader)
 {
     mpShader = &shader;
     // disable light when rendering faceline textures

@@ -1,4 +1,5 @@
 #include <Shader.h>
+#include <ShaderSwitch.h>
 
 #include <gfx/rio_Camera.h>
 #include <task/rio_Task.h>
@@ -25,6 +26,19 @@ enum MiiDataInputType {
     INPUT_TYPE_RFL_CHARDATA_LE
 };
 
+enum ShaderType {
+    SHADER_TYPE_WIIU,
+    SHADER_TYPE_SWITCH,
+    /* FUTURE OPTIONS:
+     * miitomo
+     * 3ds
+       - potentially downscaling
+     * wii...????????
+       - it would have to be some TEV to GLSL sheeee
+     */
+    SHADER_TYPE_MAX = 2,
+};
+
 struct RenderRequest {
     //FFLStoreData    storeData;
     char            data[96];   // just a buffer that accounts for maximum size
@@ -41,10 +55,10 @@ struct RenderRequest {
     //rio::BaseVec3f  lightDir;
     unsigned int    expressionFlag;
     FFLResourceType resourceType;
+    ShaderType      shaderType;
     rio::Color4f    backgroundColor; // passed to clearcolor
 };
 #define RENDERREQUEST_SIZE sizeof(RenderRequest)
-
 
 class RootTask : public rio::ITask
 {
@@ -61,6 +75,25 @@ private:
     void createModel_();
     //void createModel_(char (*buf)[FFLICHARINFO_SIZE]);
     void createModel_(RenderRequest *buf);
+
+    void initializeShaders_() {
+        for (int type = 0; type < SHADER_TYPE_MAX; type++) {
+            switch (type) {
+                case SHADER_TYPE_WIIU:
+                    mShaders[type] = new Shader();
+                    break;
+                case SHADER_TYPE_SWITCH:
+                    mShaders[type] = new ShaderSwitch();
+                    break;
+            }
+            mShaders[type]->initialize();
+        }
+    }
+    #if RIO_IS_WIN
+    void fillStoreDataArray_();
+    void setupSocket_();
+    #endif
+
     void drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx);
 
 private:
@@ -70,7 +103,7 @@ private:
     std::vector<std::vector<char>> mStoreDataArray;
     #endif
     FFLResourceDesc     mResourceDesc;
-    Shader              mShader;
+    IShader*            mShaders[SHADER_TYPE_MAX];
     rio::BaseMtx44f     mProjMtx;
     rio::BaseMtx44f*    mProjMtxIconBody;
     rio::LookAtCamera   mCamera;

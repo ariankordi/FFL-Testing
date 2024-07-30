@@ -1,5 +1,6 @@
 #include "gpu/rio_Texture.h"
 #include "math/rio_Matrix.h"
+#include "nn/ffl/FFLResourceType.h"
 #include "nn/ffl/detail/FFLiCharInfo.h"
 #include <Model.h>
 #include <RootTask.h>
@@ -58,6 +59,96 @@ int addrlen = sizeof(address);
 const rio::mdl::Model* bodyModels[FFL_GENDER_MAX];
 
 #include <mii_ext_MiiPort.h>
+
+#if RIO_IS_WIN
+// read Mii data from a folder
+void RootTask::fillStoreDataArray_()
+{
+    // Path to the folder
+    const std::string folderPath = "place_ffsd_files_here";
+    // Check if the folder exists
+    if (std::filesystem::exists(folderPath) && std::filesystem::is_directory(folderPath)) {
+        for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
+            if (entry.is_regular_file()
+                && entry.file_size() >= sizeof(charInfoStudio)
+                && entry.path().filename().string().at(0) != '.')
+            {
+                // Read the file content
+                std::ifstream file(entry.path(), std::ios::binary);
+                if (file.is_open()) {
+                    std::vector<char> data;
+                    data.resize(entry.file_size());
+                    file.read(&data[0], entry.file_size());
+                    //if (file.gcount() == sizeof(FFLStoreData)) {
+                        mStoreDataArray.push_back(data);
+                    //}
+                    file.close();
+                }
+            }
+        }
+        RIO_LOG("Loaded %lu FFSD files into mStoreDataArray\n", mStoreDataArray.size());
+    }
+}
+// Setup socket to send data to
+void RootTask::setupSocket_()
+{
+    #ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
+        perror("WSAStartup failed");
+        exit(EXIT_FAILURE);
+    }
+    #endif // ifdef _WIN32
+
+    // Creating socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Forcefully attaching socket to the port
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&opt), sizeof(opt))) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    // Get port number from environment or use default
+    const char* env_port = getenv("PORT");
+    int port = env_port ? atoi(env_port) : 12346;
+    // Forcefully attaching socket to the port
+    address.sin_port = htons(port);
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("bind failed");
+        RIO_LOG("\033[1m" \
+        "TIP: Change the default port of 12346 with the PORT environment variable" \
+        "\033[0m\n");
+        exit(EXIT_FAILURE);
+    }
+    if (listen(server_fd, 3) < 0) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    } else {
+        // Set socket to non-blocking mode
+        if (!mServerOnly) {
+            #ifdef _WIN32
+            u_long mode = 1;
+            ioctlsocket(server_fd, FIONBIO, &mode);
+            #else
+            fcntl(server_fd, F_SETFL, O_NONBLOCK);
+            #endif
+        }
+
+        mSocketIsListening = true;
+
+        RIO_LOG("\033[1m" \
+        "tcp server listening on port %d\033[0m\n" \
+        "\033[2m(you can change the port with the PORT environment variable)\033[0m\n",
+        port);
+    }
+}
+#endif
 
 void RootTask::prepare_()
 {
@@ -146,7 +237,7 @@ void RootTask::prepare_()
 
     FFLInitResGPUStep();
 
-    mShader.initialize();
+    initializeShaders_();
 
     // Get window instance
     const rio::Window* const window = rio::Window::instance();
@@ -179,7 +270,7 @@ void RootTask::prepare_()
         mProjMtx = proj.getMatrix();
 
         rio::PerspectiveProjection projIconBody(
-            10.0f,
+            5.0f,//10.0f,
             1000.0f,
             rio::Mathf::deg2rad(15.0f),
             1.0f
@@ -188,105 +279,16 @@ void RootTask::prepare_()
 
     }
 
-    // read Mii data from a folder
     #if RIO_IS_WIN
-    // Path to the folder
-    const std::string folderPath = "place_ffsd_files_here";
-    // Check if the folder exists
-    if (std::filesystem::exists(folderPath) && std::filesystem::is_directory(folderPath)) {
-        for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
-            if (entry.is_regular_file()
-                && entry.file_size() >= sizeof(charInfoStudio)
-                && entry.path().filename().string().at(0) != '.')
-            {
-                // Read the file content
-                std::ifstream file(entry.path(), std::ios::binary);
-                if (file.is_open()) {
-                    std::vector<char> data;
-                    data.resize(entry.file_size());
-                    file.read(&data[0], entry.file_size());
-                    //if (file.gcount() == sizeof(FFLStoreData)) {
-                        mStoreDataArray.push_back(data);
-                    //}
-                    file.close();
-                }
-            }
-        }
-        RIO_LOG("Loaded %lu FFSD files into mStoreDataArray\n", mStoreDataArray.size());
-    }
-    #endif // RIO_IS_WIN (folder)
+    fillStoreDataArray_();
+    setupSocket_();
+    // Set window aspect ratio, so that when resizing it will not change
+    GLFWwindow* glfwWindow = rio::Window::instance()->getNativeWindow().getGLFWwindow();
+    glfwSetWindowAspectRatio(glfwWindow, window->getWidth(), window->getHeight());
+    #endif
 
     mMiiCounter = 0;
     createModel_();
-
-    // Setup socket to send data to
-    #if RIO_IS_WIN
-    {
-        #ifdef _WIN32
-        WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
-            perror("WSAStartup failed");
-            exit(EXIT_FAILURE);
-        }
-        #endif // ifdef _WIN32
-
-        // Creating socket file descriptor
-        if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-            perror("socket failed");
-            exit(EXIT_FAILURE);
-        }
-
-        // Forcefully attaching socket to the port
-        if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&opt), sizeof(opt))) {
-            perror("setsockopt");
-            exit(EXIT_FAILURE);
-        }
-
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY;
-        // Get port number from environment or use default
-        const char* env_port = getenv("PORT");
-        int port = env_port ? atoi(env_port) : 12346;
-        // Forcefully attaching socket to the port
-        address.sin_port = htons(port);
-        if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-            perror("bind failed");
-            RIO_LOG("\033[1m" \
-            "TIP: Change the default port of 12346 with the PORT environment variable" \
-            "\033[0m\n");
-            exit(EXIT_FAILURE);
-        }
-        if (listen(server_fd, 3) < 0) {
-            perror("listen");
-            exit(EXIT_FAILURE);
-        } else {
-            // Set socket to non-blocking mode
-            if (!mServerOnly) {
-                #ifdef _WIN32
-                u_long mode = 1;
-                ioctlsocket(server_fd, FIONBIO, &mode);
-                #else
-                fcntl(server_fd, F_SETFL, O_NONBLOCK);
-                #endif
-            }
-
-            mSocketIsListening = true;
-
-            RIO_LOG("\033[1m" \
-            "tcp server listening on port %d\033[0m\n" \
-            "\033[2m(you can change the port with the PORT environment variable)\033[0m\n" \
-            "try sending FFLStoreData or FFLiCharInfo (little endian) to it with netcat\n",
-            port);
-        }
-    }
-
-    #endif // RIO_IS_WIN (socket)
-
-    // Set window aspect ratio, so that when resizing it will not change
-    #if RIO_IS_WIN
-        GLFWwindow* glfwWindow = rio::Window::instance()->getNativeWindow().getGLFWwindow();
-        glfwSetWindowAspectRatio(glfwWindow, window->getWidth(), window->getHeight());
-    #endif // RIO_IS_WIN
 
     // load (just male for now) body model
     // the male and female bodies are like identical
@@ -370,7 +372,8 @@ void RootTask::createModel_() {
     };
 
     mpModel = new Model();
-    if (!mpModel->initialize(arg, mShader)) {
+    int shaderType = SHADER_TYPE_WIIU;//(mMiiCounter-1) % (SHADER_TYPE_MAX);
+    if (!mpModel->initialize(arg, *mShaders[shaderType])) {
         delete mpModel;
         mpModel = nullptr;
     } /*else {
@@ -553,13 +556,16 @@ void RootTask::createModel_(RenderRequest *buf) {
             .resolution = buf->texResolution,
             .expressionFlag = buf->expressionFlag,
             .modelFlag = 1 << 0 | 1 << 1 | 1 << 2,
-            .resourceType = buf->resourceType,
+            .resourceType = static_cast<FFLResourceType>(buf->resourceType % FFL_RESOURCE_TYPE_MAX),
         },
         .source = modelSource
     };
 
     mpModel = new Model();
-    if (!mpModel->initialize(arg, mShader)) {
+    ShaderType whichShader = SHADER_TYPE_WIIU;
+    if (buf->resourceType > FFL_RESOURCE_TYPE_HIGH)
+        whichShader = SHADER_TYPE_SWITCH;
+    if (!mpModel->initialize(arg, *mShaders[whichShader])) {
         RIO_LOG("FFLInitCharModelCPUStep FAILED while initializing model: %d\n", mpModel->getInitializeCpuResult());
         delete mpModel;
         mpModel = nullptr;
@@ -584,7 +590,7 @@ void RootTask::drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx
 
         // BIND SHADER
         //bodyShader.bind();
-        mShader.bindBodyShader(charInfo);
+        mpModel->getShader()->bindBodyShader(charInfo);
         //RIO_GL_CALL(glBindVertexArray(vao));
 
         rio::BaseMtx34f view_mtx;
@@ -632,7 +638,7 @@ void RootTask::drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx
         model_mtx.m[1][1] = scaleFactors.y; // Scale y-axis
         model_mtx.m[2][2] = scaleFactors.z; // Scale z-axis
 
-        mShader.setViewUniformBody(model_mtx, view_mtx, proj_mtx);
+        mpModel->getShader()->setViewUniformBody(model_mtx, view_mtx, proj_mtx);
 
         // finally, the uniforms are all set
 
@@ -670,8 +676,13 @@ void RootTask::handleRenderRequest(char* buf, rio::BaseMtx34f view_mtx) {
         projMtx = mProjMtxIconBody;
         // NOTE: adjusted to be slightly more accurate but still not right
         // FFLMakeIconWithBody view uses 37.05f, 415.53f
+        // nn::mii::VariableIconBody::StoreCameraMatrix uses 37.0f, 380.0f
         mCamera.pos() = { 0.0f, 34.20f, 412.0f };
         mCamera.at() = { 0.0f, 34.20f, 0.0f };
+        /*
+        mCamera.pos() = { 0.0f, 34.20f, 412.0f };
+        mCamera.at() = { 0.0f, 34.20f, 0.0f };
+        */
         mCamera.setUp({ 0.0f, 1.0f, 0.0f });
         mCamera.getMatrix(&view_mtx);
         // without this it will use the default view matrix
@@ -1008,7 +1019,7 @@ void RootTask::calc_()
     // Move the camera around the target clockwise
     // Define the radius of the orbit in the XZ-plane (distance from the target)
     const char* noSpin = getenv("NO_SPIN");
-    if (!noSpin && !mServerOnly) {
+    if (!noSpin && !mServerOnly && !hasSocketRequest) {
         radius += 380;
         mCamera.pos().set(
             // Set the camera's position using the sin and cos functions to move it in a circle around the target
@@ -1064,6 +1075,9 @@ void RootTask::exit_()
     }
 
     delete mProjMtxIconBody;
+    for (int type = 0; type < SHADER_TYPE_MAX; type++) {
+        delete mShaders[type];
+    }
 
     mInitialized = false;
 }

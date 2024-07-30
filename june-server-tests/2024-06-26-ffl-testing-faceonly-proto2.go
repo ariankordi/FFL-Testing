@@ -55,6 +55,7 @@ type RenderRequest struct {
 	_                 [1]byte // padding
 	ExpressionFlag    uint32
 	ResourceType      uint32
+	ShaderType        int32
 	BackgroundColor   [4]float32
 }
 
@@ -380,7 +381,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no support for pretendo yet sorry, try this: https://mii-unsecure.ariankordi.net/mii_data/PN_Jon?api_id=1", http.StatusNotImplemented)
 		return
 	}
-	resourceTypeStr := query.Get("resourceTypeFFL")
+	resourceTypeStr := query.Get("resourceType")
 	if resourceTypeStr == "" {
 		resourceTypeStr = "1"
 	}
@@ -528,6 +529,11 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	// convert bgColor to floats
 	bgColor4f := [4]float32{float32(bgColor.R), float32(bgColor.G), float32(bgColor.B), float32(bgColor.A)}
 
+	shaderType := 0
+	if resourceType > 1 {
+		shaderType = 1
+	}
+
 	// Creating the render request
 	renderRequest := RenderRequest{
 		Data:            [96]byte{},
@@ -539,6 +545,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		LightEnable:     lightEnable,
 		ExpressionFlag:  uint32(expressionFlag),
 		ResourceType:    uint32(resourceType),
+		ShaderType:      int32(shaderType),
 		BackgroundColor: bgColor4f,
 	}
 

@@ -41,12 +41,13 @@ class RenderRequest:
         self.light_enable = True
         self.expression_flag = expression_flag
         self.resource_type = resource_type
+        self.shader_type = (1 if resource_type > 1 else 0)
         # encode bg color to vec4
         self.background_color = [component / 255.0 for component in background_color]
 
     def pack(self):
         return struct.pack(
-            '96sIII???II4f',
+            '96sIII???III4f',
             # todo this may need restructuring
             # bc it does not make much sense
             self.data,
@@ -58,6 +59,7 @@ class RenderRequest:
             self.light_enable,
             self.expression_flag,
             self.resource_type,
+            self.shader_type,
             self.background_color[0], self.background_color[1], self.background_color[2], self.background_color[3]
         )
 
@@ -149,7 +151,7 @@ def render_image():
     tex_resolution = request.args.get('texResolution', width)
     nnid = request.args.get('nnid')
     #color_index = request.args.get('clothesColor', 'default')  # Default to purple
-    resource_type = request.args.get('resourceTypeFFL', '1')
+    resource_type = request.args.get('resourceType', '1')
     mipmap_enable = request.args.get('mipmapEnable', '0')
 
     if not data and not nnid:

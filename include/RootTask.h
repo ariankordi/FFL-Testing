@@ -2,7 +2,9 @@
 #include <ShaderSwitch.h>
 
 #include <gfx/rio_Camera.h>
+#include <gfx/mdl/rio_Model.h>
 #include <task/rio_Task.h>
+
 
 #include <nn/ffl.h>
 #include <nn/ffl/FFLiMiiData.h>
@@ -39,26 +41,42 @@ enum ShaderType {
     SHADER_TYPE_MAX = 2,
 };
 
+enum ViewType {
+    VIEW_TYPE_FACE,  // head with body
+    VIEW_TYPE_FACE_ONLY,  // head only
+    VIEW_TYPE_ALL_BODY,
+    // nn::mii::VariableIconBody::StoreCameraMatrix
+    VIEW_TYPE_NNMII_VARIABLEICONBODY_VIEW,
+    VIEW_TYPE_MAX = 4,
+};
+
 struct RenderRequest {
-    //FFLStoreData    storeData;
     char            data[96];   // just a buffer that accounts for maximum size
-    unsigned int    dataLength; // determines the mii data format
+    uint16_t        dataLength; // determines the mii data format
     unsigned int    resolution; // resolution for render buffer
     // NOTE: texture resolution can control whether mipmap is enabled (1 << 30)
     FFLResolution   texResolution; // u32, or just uint, i think
     //unsigned int    scaleFactor;
-    bool            isHeadOnly;
+    //bool            isHeadOnly;  // in favor of view type
+    uint8_t         viewType;
+    //rio::BaseVec3f  lightDir;
+    uint8_t         expression;
+    uint8_t         resourceType;
+    uint8_t         shaderType;
+    rio::Vector3i   cameraRotate;
+    uint8_t         backgroundColor[4]; // passed to clearcolor
+
+    // at the end to help with alignment
     bool            verifyCharInfo; // for FFLiVerifyCharInfoWithReason
     // TBD you may need another one for verifying StoreData CRC16
     bool            lightEnable;
     //bool            setLightDirection;
-    //rio::BaseVec3f  lightDir;
-    unsigned int    expressionFlag;
-    FFLResourceType resourceType;
-    ShaderType      shaderType;
-    rio::Color4f    backgroundColor; // passed to clearcolor
 };
 #define RENDERREQUEST_SIZE sizeof(RenderRequest)
+
+// used for pickupCharInfoFromRenderRequest
+#include <mii_ext_MiiPort.h>
+bool pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, int dataLength, RenderRequest *buf);
 
 class RootTask : public rio::ITask
 {
@@ -80,13 +98,13 @@ private:
         for (int type = 0; type < SHADER_TYPE_MAX; type++) {
             switch (type) {
                 case SHADER_TYPE_WIIU:
-                    mShaders[type] = new Shader();
+                    mpShaders[type] = new Shader();
                     break;
                 case SHADER_TYPE_SWITCH:
-                    mShaders[type] = new ShaderSwitch();
+                    mpShaders[type] = new ShaderSwitch();
                     break;
             }
-            mShaders[type]->initialize();
+            mpShaders[type]->initialize();
         }
     }
     #if RIO_IS_WIN
@@ -103,12 +121,13 @@ private:
     std::vector<std::vector<char>> mStoreDataArray;
     #endif
     FFLResourceDesc     mResourceDesc;
-    IShader*            mShaders[SHADER_TYPE_MAX];
+    IShader*            mpShaders[SHADER_TYPE_MAX];
     rio::BaseMtx44f     mProjMtx;
     rio::BaseMtx44f*    mProjMtxIconBody;
     rio::LookAtCamera   mCamera;
     f32                 mCounter;
     s32                 mMiiCounter;
     Model*              mpModel;
-    const char*         mServerOnly;
+    rio::mdl::Model*    mpBodyModels[FFL_GENDER_MAX];
+    const char*         mpServerOnly;
 };

@@ -12,7 +12,6 @@
 #include <gpu/rio_RenderState.h>
 
 #include <gfx/mdl/res/rio_ModelCacher.h>
-#include <gfx/mdl/rio_Model.h>
 
 #include <nn/ffl/FFLiSwapEndian.h>
 
@@ -23,7 +22,7 @@ RootTask::RootTask()
     : ITask("FFL Testing")
     , mInitialized(false)
     // disables occasionally drawing mii and makes non blocking
-    , mServerOnly(getenv("SERVER_ONLY"))
+    , mpServerOnly(getenv("SERVER_ONLY"))
 {
 }
 
@@ -44,23 +43,11 @@ RootTask::RootTask()
 #include <nn/ffl/FFLiCreateID.h>
 
 #if RIO_IS_WIN
-int server_fd, new_socket;
-struct sockaddr_in address;
-int opt = 1;
-int addrlen = sizeof(address);
 
 // for opening ffsd folder
 #include <filesystem>
 #include <fstream>
-#endif
 
-// forward declarations for drawing body model
-//rio::mdl::res::Model* bodyResModels[FFL_GENDER_MAX];
-const rio::mdl::Model* bodyModels[FFL_GENDER_MAX];
-
-#include <mii_ext_MiiPort.h>
-
-#if RIO_IS_WIN
 // read Mii data from a folder
 void RootTask::fillStoreDataArray_()
 {
@@ -89,6 +76,12 @@ void RootTask::fillStoreDataArray_()
         RIO_LOG("Loaded %lu FFSD files into mStoreDataArray\n", mStoreDataArray.size());
     }
 }
+
+int server_fd, new_socket;
+struct sockaddr_in address;
+int opt = 1;
+int addrlen = sizeof(address);
+
 // Setup socket to send data to
 void RootTask::setupSocket_()
 {
@@ -131,7 +124,7 @@ void RootTask::setupSocket_()
         exit(EXIT_FAILURE);
     } else {
         // Set socket to non-blocking mode
-        if (!mServerOnly) {
+        if (!mpServerOnly) {
             #ifdef _WIN32
             u_long mode = 1;
             ioctlsocket(server_fd, FIONBIO, &mode);
@@ -302,7 +295,7 @@ void RootTask::prepare_()
         key[sizeof(key)-2]++; // iterate last character
         RIO_ASSERT(resModel);
 
-        bodyModels[i] = new rio::mdl::Model(resModel);
+        mpBodyModels[i] = new rio::mdl::Model(resModel);
     }
     //RIO_ASSERT(loadBodyGLTF(&gltfBodyModel, bodyGltfMaleFilename));
     //bodyShader.load("FFLBodyShader");
@@ -315,9 +308,7 @@ void RootTask::prepare_()
 // GetMiiDataNum()
 int maxMiis = 6;
 
-// forward declaration
-bool pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, int dataLength, RenderRequest *buf);
-
+// create model for displaying on screen
 void RootTask::createModel_() {
     FFLCharModelSource modelSource;
 
@@ -373,7 +364,7 @@ void RootTask::createModel_() {
 
     mpModel = new Model();
     int shaderType = SHADER_TYPE_WIIU;//(mMiiCounter-1) % (SHADER_TYPE_MAX);
-    if (!mpModel->initialize(arg, *mShaders[shaderType])) {
+    if (!mpModel->initialize(arg, *mpShaders[shaderType])) {
         delete mpModel;
         mpModel = nullptr;
     } /*else {
@@ -511,6 +502,7 @@ bool pickupCharInfoFromRenderRequest(FFLiCharInfo* pCharInfo, int dataLength, Re
     return true;
 }
 
+// create model for render request
 void RootTask::createModel_(RenderRequest *buf) {
     FFLiCharInfo charInfo;
 
@@ -554,7 +546,7 @@ void RootTask::createModel_(RenderRequest *buf) {
     Model::InitArgStoreData arg = {
         .desc = {
             .resolution = buf->texResolution,
-            .expressionFlag = buf->expressionFlag,
+            .expressionFlag = static_cast<u32>(1 << buf->expression),
             .modelFlag = 1 << 0 | 1 << 1 | 1 << 2,
             .resourceType = static_cast<FFLResourceType>(buf->resourceType % FFL_RESOURCE_TYPE_MAX),
         },
@@ -565,7 +557,7 @@ void RootTask::createModel_(RenderRequest *buf) {
     ShaderType whichShader = SHADER_TYPE_WIIU;
     if (buf->resourceType > FFL_RESOURCE_TYPE_HIGH)
         whichShader = SHADER_TYPE_SWITCH;
-    if (!mpModel->initialize(arg, *mShaders[whichShader])) {
+    if (!mpModel->initialize(arg, *mpShaders[whichShader])) {
         RIO_LOG("FFLInitCharModelCPUStep FAILED while initializing model: %d\n", mpModel->getInitializeCpuResult());
         delete mpModel;
         mpModel = nullptr;
@@ -579,7 +571,7 @@ void RootTask::createModel_(RenderRequest *buf) {
 void RootTask::drawMiiBodyREAL(FFLiCharInfo* charInfo, rio::BaseMtx44f& proj_mtx) {
 
     // SELECT BODY MODEL
-    const rio::mdl::Model* model = bodyModels[charInfo->gender];
+    const rio::mdl::Model* model = mpBodyModels[charInfo->gender];
 
     const rio::mdl::Mesh* const meshes = model->meshes();
 
@@ -668,7 +660,7 @@ void RootTask::handleRenderRequest(char* buf, rio::BaseMtx34f view_mtx) {
 
     // switch between two projection matrxies
     rio::BaseMtx44f *projMtx;
-    if (renderRequest->isHeadOnly) {
+    if (renderRequest->viewType == VIEW_TYPE_FACE_ONLY) {
         // use default if request is head only
         projMtx = &mProjMtx;
     } else {
@@ -742,7 +734,14 @@ RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RE
 */
     //const rio::Color4f clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
     // NOTE: this calls glViewport
-    renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, renderRequest->backgroundColor);
+    // make background color float from RGBA bytes
+    rio::Color4f fBackgroundColor = {
+        static_cast<f32>(renderRequest->backgroundColor[0]) / 256,
+        static_cast<f32>(renderRequest->backgroundColor[1]) / 256,
+        static_cast<f32>(renderRequest->backgroundColor[2]) / 256,
+        static_cast<f32>(renderRequest->backgroundColor[3]) / 256
+    };
+    renderBuffer.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, fBackgroundColor);
 
     // Bind the render buffer
     renderBuffer.bind();
@@ -770,7 +769,7 @@ RIO_GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RE
     RIO_LOG("drawOpa rendered to the buffer.\n");
 
     // draw body?
-    if (!renderRequest->isHeadOnly)
+    if (renderRequest->viewType != VIEW_TYPE_FACE_ONLY)
     {
         FFLiCharModel *charModel = reinterpret_cast<FFLiCharModel*>(mpModel->getCharModel());
 
@@ -943,7 +942,7 @@ downsampleShader.unload();
 
     RIO_LOG("Render buffer unbound and GPU cache invalidated.\n");
 
-    if (!mServerOnly) {
+    if (!mpServerOnly) {
         #ifdef RIO_NO_CLIP_CONTROL
             // set back front face culling
             RIO_GL_CALL(glFrontFace(GL_CCW));
@@ -999,7 +998,7 @@ void RootTask::calc_()
         // otherwise just fall through and use default
         // when mii is directly in front of the camera
     #endif // RIO_IS_WIN
-        if (!mServerOnly && mCounter >= rio::Mathf::pi2())
+        if (!mpServerOnly && mCounter >= rio::Mathf::pi2())
         {
             delete mpModel;
             createModel_();
@@ -1019,7 +1018,7 @@ void RootTask::calc_()
     // Move the camera around the target clockwise
     // Define the radius of the orbit in the XZ-plane (distance from the target)
     const char* noSpin = getenv("NO_SPIN");
-    if (!noSpin && !mServerOnly && !hasSocketRequest) {
+    if (!noSpin && !mpServerOnly && !hasSocketRequest) {
         radius += 380;
         mCamera.pos().set(
             // Set the camera's position using the sin and cos functions to move it in a circle around the target
@@ -1033,7 +1032,7 @@ void RootTask::calc_()
         mCamera.pos() = CENTER_POS;
     }
     // Increment the counter to gradually change the camera's position over time
-    if (!mServerOnly) {
+    if (!mpServerOnly) {
         mCounter += 1.f / 60;
     }
 
@@ -1041,7 +1040,7 @@ void RootTask::calc_()
     rio::BaseMtx34f view_mtx;
     mCamera.getMatrix(&view_mtx);
 
-    if (!mServerOnly) {
+    if (!mpServerOnly) {
         rio::Window::instance()->clearColor(0.2f, 0.3f, 0.3f, 1.0f);
         rio::Window::instance()->clearDepthStencil();
         //rio::Window::instance()->setSwapInterval(0);  // disable v-sync
@@ -1064,6 +1063,9 @@ void RootTask::exit_()
     if (!mInitialized)
         return;
 
+    // we need to free stuff that's allocated in our program
+    // ... which is usually all pointers
+
     delete mpModel; // FFLCharModel destruction must happen before FFLExit
     mpModel = nullptr;
 
@@ -1075,8 +1077,13 @@ void RootTask::exit_()
     }
 
     delete mProjMtxIconBody;
+    // delete all shaders that were initialized
     for (int type = 0; type < SHADER_TYPE_MAX; type++) {
-        delete mShaders[type];
+        delete mpShaders[type];
+    }
+    // delete body models that were initialized earlier
+    for (u32 i = 0; i < FFL_GENDER_MAX; i++) {
+        delete mpBodyModels[i];
     }
 
     mInitialized = false;

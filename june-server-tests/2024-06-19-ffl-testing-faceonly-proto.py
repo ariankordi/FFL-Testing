@@ -26,41 +26,48 @@ FFL_RESOLUTION_MASK = 0x3fffffff
 FFL_RESOLUTION_MIP_MAP_ENABLE_MASK = 1 << 30
 # Define the RenderRequest struct
 class RenderRequest:
-    def __init__(self, data, resolution=1024, tex_resolution=1024, is_head_only=False, expression_flag=1, resource_type=1, mipmap_enable=False, background_color=(0, 0, 0, 0)):
+    def __init__(self, data, resolution=1024, tex_resolution=1024, is_head_only=False, expression=0, resource_type=1, mipmap_enable=False, background_color=[0, 0, 0, 0]):
         self.data = bytes(data)
         self.data_length = len(data)
         self.resolution = resolution
         actual_tex_resolution = tex_resolution & FFL_RESOLUTION_MASK
         mipmap_tex_resolution = tex_resolution + FFL_RESOLUTION_MIP_MAP_ENABLE_MASK
         self.tex_resolution = mipmap_tex_resolution if mipmap_enable else actual_tex_resolution
-        self.is_head_only = is_head_only
+        #self.is_head_only = is_head_only
         # NOTE: if you want to still use
         # this script then uhhhhhhhhhh
         # you can redefine these here
         self.verify_charinfo = False
         self.light_enable = True
-        self.expression_flag = expression_flag
+        self.expression = expression
         self.resource_type = resource_type
+        self.view_type = (1 if is_head_only else 0)
         self.shader_type = (1 if resource_type > 1 else 0)
         # encode bg color to vec4
-        self.background_color = [component / 255.0 for component in background_color]
+        #self.background_color = [component / 255.0 for component in background_color]
+        self.background_color = background_color
+        self.camera_rotate = [0, 0, 0]
 
     def pack(self):
         return struct.pack(
-            '96sIII???III4f',
-            # todo this may need restructuring
-            # bc it does not make much sense
-            self.data,
-            self.data_length,
-            self.resolution,
-            self.tex_resolution,
-            self.is_head_only,
-            self.verify_charinfo,
-            self.light_enable,
-            self.expression_flag,
-            self.resource_type,
-            self.shader_type,
-            self.background_color[0], self.background_color[1], self.background_color[2], self.background_color[3]
+            '96sHII4Biii4B??2x',       # padding at the end
+            self.data,                 # data: 96s
+            self.data_length,          # dataLength: H (uint16_t)
+            self.resolution,           # resolution: I (unsigned int)
+            self.tex_resolution,       # texResolution: I (unsigned int)
+            self.view_type,            # viewType: B (uint8_t)
+            self.expression,           # expression: B (uint8_t)
+            self.resource_type,        # resourceType: B (uint8_t)
+            self.shader_type,          # shaderType: B (uint8_t)
+            self.camera_rotate[0],     # cameraRotate.x: i (int32_t)
+            self.camera_rotate[1],     # cameraRotate.y: i (int32_t)
+            self.camera_rotate[2],     # cameraRotate.z: i (int32_t)
+            self.background_color[0],  # backgroundColor[0]: B (uint8_t)
+            self.background_color[1],  # backgroundColor[1]: B (uint8_t)
+            self.background_color[2],  # backgroundColor[2]: B (uint8_t)
+            self.background_color[3],  # backgroundColor[3]: B (uint8_t)
+            self.verify_charinfo,      # verifyCharInfo: ? (bool)
+            self.light_enable          # lightEnable: ? (bool),
         )
 
 def load_rgba_buffer(buffer_data, width, height):
@@ -146,7 +153,7 @@ def is_hex(s):
 def render_image():
     data = request.args.get('data')
     type_ = request.args.get('type', 'face')
-    expression_flag = request.args.get('expression', '1')
+    expression = request.args.get('expression', '0')
     width = request.args.get('width', '1024')
     tex_resolution = request.args.get('texResolution', width)
     nnid = request.args.get('nnid')
@@ -183,10 +190,10 @@ def render_image():
     mipmap_enable = mipmap_enable == '1'
 
     try:
-        expression_flag = int(expression_flag)
+        expression = int(expression)
     except ValueError:
-        return make_response('oh, sorry... expression is the expression FLAG, not the name of the expression. find the values <a href="https://github.com/ariankordi/nwf-mii-cemu-toy/blob/master/nwf-app/js/render-listener.js#L138">here</a>', 400)
-    expression_flag = 1 if expression_flag < 1 else expression_flag
+        return make_response('expression should be a value under the number 18', 400)
+    expression = 0 if expression > 18 else expression
 
     try:
         width = int(width)
@@ -217,7 +224,7 @@ def render_image():
     except ValueError:
         return make_response('resource type is not a number', 400)
 
-    render_request = RenderRequest(store_data, width, tex_resolution, is_head_only, expression_flag, resource_type, mipmap_enable)
+    render_request = RenderRequest(store_data, width, tex_resolution, is_head_only, expression, resource_type, mipmap_enable)
 
     # Send the render request and receive buffer and buffer2 data
     try:

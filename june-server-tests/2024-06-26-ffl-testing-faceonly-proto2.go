@@ -44,19 +44,53 @@ const (
 // Added padding bytes to ensure compliance with the original C++ struct.
 type RenderRequest struct {
 	Data              [96]byte
-	DataLength        uint32
+	DataLength        uint16
+	_                 [2]byte
+	// NOTE: arbitrary resolutions CRASH THE BACKEND
 	Resolution        uint32
 	TexResolution     uint32
-	IsHeadOnly        bool
+	ViewType          uint8
+	Expression        uint8
+	ResourceType      uint8
+	ShaderType        uint8
+	CameraRotate      [3]int32
+	BackgroundColor   [4]uint8
+
 	VerifyCharInfo    bool
 	LightEnable       bool
+	_                 [2]byte
 	//SetLightDirection bool
 	//LightDirection    [3]float32
-	_                 [1]byte // padding
-	ExpressionFlag    uint32
-	ResourceType      uint32
-	ShaderType        int32
-	BackgroundColor   [4]float32
+}
+/*
+struct RenderRequest {
+    char            data[96];   // just a buffer that accounts for maximum size
+    uint16_t        dataLength; // determines the mii data format
+    unsigned int    resolution; // resolution for render buffer
+    // NOTE: texture resolution can control whether mipmap is enabled (1 << 30)
+    FFLResolution   texResolution; // u32, or just uint, i think
+    //unsigned int    scaleFactor;
+    //bool            isHeadOnly;  // in favor of view type
+    uint8_t         viewType;
+    //rio::BaseVec3f  lightDir;
+    uint8_t         expression;
+    uint8_t         resourceType;
+    uint8_t         shaderType;
+    rio::Vector3i   cameraRotate;
+    uint8_t         backgroundColor[4]; // passed to clearcolor
+
+    // at the end to help with alignment
+    bool            verifyCharInfo; // for FFLiVerifyCharInfoWithReason
+    // TBD you may need another one for verifying StoreData CRC16
+    bool            lightEnable;
+    //bool            setLightDirection;
+};
+*/
+var viewTypes = map[string]int {
+	"face":             0,
+	"face_only":        1,
+	"all_body":         2,
+	"variableiconbody": 3,
 }
 
 func sayHello(w http.ResponseWriter, r *http.Request) {
@@ -458,9 +492,16 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Determining if only the head should be rendered
-	// NOTE: no all_body for now
-	isHeadOnly := typeStr == "face_only"
+	viewTypeStr := query.Get("type")
+	if viewTypeStr == "" {
+		viewTypeStr = "face"
+	}
+
+	viewType, exists := viewTypes[viewTypeStr]
+	if !exists {
+		http.Error(w, "we did not implement that view sorry", http.StatusBadRequest)
+		return
+	}
 	// NOTE: WHAT SHOULD BOOLS LOOK LIKE...???
 	mipmapEnable := query.Get("mipmapEnable") != "" // is present?
 	lightEnable := query.Get("lightEnable") != "0" // 0 = no lighting
@@ -475,7 +516,8 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	if expressionFlag < 1 {
 		expressionFlag = 1
 	}*/
-	expressionFlag := getExpressionFlag(expressionStr)
+	//expressionFlag := getExpressionFlag(expressionStr)
+	expression := getExpressionInt(expressionStr)
 
 	// Parsing and validating width
 	width, err := strconv.Atoi(widthStr)
@@ -513,6 +555,29 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+
+	cameraRotateVec3i := [3]int32{0, 0, 0}
+
+	// Read and parse query parameters
+	if camXPos := query.Get("cameraXRotate"); camXPos != "" {
+		x, err := strconv.Atoi(camXPos)
+		if err == nil {
+			cameraRotateVec3i[0] = int32(x)
+		}
+	}
+	if camYPos := query.Get("cameraYRotate"); camYPos != "" {
+		y, err := strconv.Atoi(camYPos)
+		if err == nil {
+			cameraRotateVec3i[1] = int32(y)
+		}
+	}
+	if camZPos := query.Get("cameraZRotate"); camZPos != "" {
+		z, err := strconv.Atoi(camZPos)
+		if err == nil {
+			cameraRotateVec3i[2] = int32(z)
+		}
+	}
+
 	// Strip mipmap bit from texResolution
 	texResolution &= FFLResolutionMask
 	// Also multiply it by two if it's particularly low...
@@ -527,7 +592,9 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// convert bgColor to floats
-	bgColor4f := [4]float32{float32(bgColor.R), float32(bgColor.G), float32(bgColor.B), float32(bgColor.A)}
+	//bgColor4f := [4]float32{float32(bgColor.R), float32(bgColor.G), float32(bgColor.B), float32(bgColor.A)}
+
+	bgColor4u8 := [4]uint8{bgColor.R, bgColor.G, bgColor.B, bgColor.A}
 
 	shaderType := 0
 	if resourceType > 1 {
@@ -537,16 +604,17 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	// Creating the render request
 	renderRequest := RenderRequest{
 		Data:            [96]byte{},
-		DataLength:      uint32(len(storeData)),
+		DataLength:      uint16(len(storeData)),
 		Resolution:      uint32(width),
 		TexResolution:   uint32(texResolution),
-		IsHeadOnly:      isHeadOnly,
+		ViewType:        uint8(viewType),
+		Expression:      uint8(expression),
+		ResourceType:    uint8(resourceType),
+		ShaderType:      uint8(shaderType),
+		CameraRotate:    cameraRotateVec3i,
+		BackgroundColor: bgColor4u8,
 		VerifyCharInfo:  verifyCharInfo,
 		LightEnable:     lightEnable,
-		ExpressionFlag:  uint32(expressionFlag),
-		ResourceType:    uint32(resourceType),
-		ShaderType:      int32(shaderType),
-		BackgroundColor: bgColor4f,
 	}
 
 	// Enabling mipmap if specified
@@ -679,39 +747,47 @@ const (
 
 // Map of expression strings to their respective flags
 var expressionMap = map[string]int{
-	"surprise":              FFL_EXPRESSION_FLAG_SURPRISE,
-	"surprise_open_mouth":   FFL_EXPRESSION_FLAG_SURPRISE_OPEN_MOUTH,
-	"wink_left_open_mouth":  FFL_EXPRESSION_FLAG_WINK_LEFT_OPEN_MOUTH,
-	"like":                  FFL_EXPRESSION_FLAG_LIKE,
-	"anger_open_mouth":      FFL_EXPRESSION_FLAG_ANGER_OPEN_MOUTH,
-	"blink_open_mouth":      FFL_EXPRESSION_FLAG_BLINK_OPEN_MOUTH,
-	"anger":                 FFL_EXPRESSION_FLAG_ANGER,
-	"like_wink_left":        FFL_EXPRESSION_FLAG_LIKE,
-	"happy":                 FFL_EXPRESSION_FLAG_HAPPY,
-	"blink":                 FFL_EXPRESSION_FLAG_BLINK,
-	"smile":                 FFL_EXPRESSION_FLAG_SMILE,
-	"sorrow_open_mouth":     FFL_EXPRESSION_FLAG_SORROW_OPEN_MOUTH,
-	"wink_right":            FFL_EXPRESSION_FLAG_WINK_RIGHT,
-	"sorrow":                FFL_EXPRESSION_FLAG_SORROW,
-	"normal":                FFL_EXPRESSION_FLAG_NORMAL,
-	"like_wink_right":       FFL_EXPRESSION_FLAG_LIKE_WINK_RIGHT,
-	"wink_right_open_mouth": FFL_EXPRESSION_FLAG_WINK_RIGHT_OPEN_MOUTH,
-	"smile_open_mouth":      FFL_EXPRESSION_FLAG_HAPPY,
-	"frustrated":            FFL_EXPRESSION_FLAG_FRUSTRATED,
-	"surprised":             FFL_EXPRESSION_FLAG_SURPRISE,
-	"wink_left":             FFL_EXPRESSION_FLAG_WINK_LEFT,
-	"open_mouth":            FFL_EXPRESSION_FLAG_OPEN_MOUTH,
-	"puzzled":               FFL_EXPRESSION_FLAG_SORROW, // assuming PUZZLED is similar to SORROW
-	"normal_open_mouth":     FFL_EXPRESSION_FLAG_OPEN_MOUTH,
+	"surprise":              FFL_EXPRESSION_SURPRISE,
+	"surprise_open_mouth":   FFL_EXPRESSION_SURPRISE_OPEN_MOUTH,
+	"wink_left_open_mouth":  FFL_EXPRESSION_WINK_LEFT_OPEN_MOUTH,
+	"like":                  FFL_EXPRESSION_LIKE,
+	"anger_open_mouth":      FFL_EXPRESSION_ANGER_OPEN_MOUTH,
+	"blink_open_mouth":      FFL_EXPRESSION_BLINK_OPEN_MOUTH,
+	"anger":                 FFL_EXPRESSION_ANGER,
+	"like_wink_left":        FFL_EXPRESSION_LIKE,
+	"happy":                 FFL_EXPRESSION_HAPPY,
+	"blink":                 FFL_EXPRESSION_BLINK,
+	"smile":                 FFL_EXPRESSION_SMILE,
+	"sorrow_open_mouth":     FFL_EXPRESSION_SORROW_OPEN_MOUTH,
+	"wink_right":            FFL_EXPRESSION_WINK_RIGHT,
+	"sorrow":                FFL_EXPRESSION_SORROW,
+	"normal":                FFL_EXPRESSION_NORMAL,
+	"like_wink_right":       FFL_EXPRESSION_LIKE_WINK_RIGHT,
+	"wink_right_open_mouth": FFL_EXPRESSION_WINK_RIGHT_OPEN_MOUTH,
+	"smile_open_mouth":      FFL_EXPRESSION_HAPPY,
+	"frustrated":            FFL_EXPRESSION_FRUSTRATED,
+	"surprised":             FFL_EXPRESSION_SURPRISE,
+	"wink_left":             FFL_EXPRESSION_WINK_LEFT,
+	"open_mouth":            FFL_EXPRESSION_OPEN_MOUTH,
+	"puzzled":               FFL_EXPRESSION_SORROW, // assuming PUZZLED is similar to SORROW
+	"normal_open_mouth":     FFL_EXPRESSION_OPEN_MOUTH,
 }
 
 // Function to map a string input to an expression flag
 func getExpressionFlag(input string) int {
 	input = strings.ToLower(input)
-	if flag, exists := expressionMap[input]; exists {
-		return flag
+	if expression, exists := expressionMap[input]; exists {
+		return 1 << expression
 	}
-	return FFL_EXPRESSION_FLAG_NORMAL
+	return 1 << FFL_EXPRESSION_NORMAL
+}
+
+func getExpressionInt(input string) int {
+	input = strings.ToLower(input)
+	if expression, exists := expressionMap[input]; exists {
+		return expression
+	}
+	return FFL_EXPRESSION_NORMAL
 }
 
 

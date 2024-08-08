@@ -88,48 +88,6 @@ void safeNormalizeVec3(rio::BaseVec3f* vec) {
     }
 }
 
-void gramSchmidtOrthonormalizeMtx34(rio::BaseMtx34f* mat)
-{
-    rio::BaseVec3f c0, c0Normalized, c1, c1Normalized, c1New, c2New;
-
-    // Extract and normalize the first column
-    c0.x = mat->m[0][0];
-    c0.y = mat->m[1][0];
-    c0.z = mat->m[2][0];
-    c0Normalized = c0;
-    safeNormalizeVec3(&c0Normalized);
-
-    // Extract and normalize the second column
-    c1.x = mat->m[0][1];
-    c1.y = mat->m[1][1];
-    c1.z = mat->m[2][1];
-    c1Normalized = c1;
-    safeNormalizeVec3(&c1Normalized);
-
-    // Compute the third column as the cross product of the first two normalized columns
-    c2New.x = c0Normalized.y * c1Normalized.z - c0Normalized.z * c1Normalized.y;
-    c2New.y = c0Normalized.z * c1Normalized.x - c0Normalized.x * c1Normalized.z;
-    c2New.z = c0Normalized.x * c1Normalized.y - c0Normalized.y * c1Normalized.x;
-
-    // Compute the new second column as the cross product of the third column and the first normalized column
-    c1New.x = c2New.y * c0Normalized.z - c2New.z * c0Normalized.y;
-    c1New.y = c2New.z * c0Normalized.x - c2New.x * c0Normalized.z;
-    c1New.z = c2New.x * c0Normalized.y - c2New.y * c0Normalized.x;
-
-    // Update the matrix with the new orthonormal columns
-    mat->m[0][0] = c0Normalized.x;
-    mat->m[1][0] = c0Normalized.y;
-    mat->m[2][0] = c0Normalized.z;
-
-    mat->m[0][1] = c1New.x;
-    mat->m[1][1] = c1New.y;
-    mat->m[2][1] = c1New.z;
-
-    mat->m[0][2] = c2New.x;
-    mat->m[1][2] = c2New.y;
-    mat->m[2][2] = c2New.z;
-}
-
 // NOTE: there isn't a concrete way to determine the gamma type
 // I don't know how it's being set OR if the decomp provides a way to set it
 //static bool sGammaType = FFLiUseOffScreenSrgbFetch() ? 0 : 1;//1 : 0;

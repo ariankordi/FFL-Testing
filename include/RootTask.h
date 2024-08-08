@@ -130,4 +130,5 @@ private:
     Model*              mpModel;
     rio::mdl::Model*    mpBodyModels[FFL_GENDER_MAX];
     const char*         mpServerOnly;
+    const char*         mpNoSpin;
 };

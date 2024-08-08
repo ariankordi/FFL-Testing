@@ -23,6 +23,7 @@ RootTask::RootTask()
     , mInitialized(false)
     // disables occasionally drawing mii and makes non blocking
     , mpServerOnly(getenv("SERVER_ONLY"))
+    , mpNoSpin(getenv("NO_SPIN"))
 {
 }
 
@@ -286,7 +287,7 @@ void RootTask::prepare_()
     // load (just male for now) body model
     // the male and female bodies are like identical
     // from the torso up (only perspective we use)
-    char key[17] = "mii_static_body0";
+    char key[] = "mii_static_body0";
     for (u32 i = 0; i < FFL_GENDER_MAX; i++)
     {
         RIO_LOG("loading model: %s\n", key);
@@ -555,8 +556,8 @@ void RootTask::createModel_(RenderRequest *buf) {
 
     mpModel = new Model();
     ShaderType whichShader = SHADER_TYPE_WIIU;
-    if (buf->resourceType > FFL_RESOURCE_TYPE_HIGH)
-        whichShader = SHADER_TYPE_SWITCH;
+    if (buf->shaderType < SHADER_TYPE_MAX)
+        whichShader = static_cast<ShaderType>(buf->shaderType);
     if (!mpModel->initialize(arg, *mpShaders[whichShader])) {
         RIO_LOG("FFLInitCharModelCPUStep FAILED while initializing model: %d\n", mpModel->getInitializeCpuResult());
         delete mpModel;
@@ -925,6 +926,8 @@ downsampleShader.unload();
     delete[] readBuffer;
 #endif
 
+    RIO_LOG("Wrote %d bytes out to socket.\n", bufferSize);
+
 
     // Unbind the render buffer
     renderBuffer.getRenderTargetColor()->invalidateGPUCache();
@@ -1017,8 +1020,7 @@ void RootTask::calc_()
     mCamera.setUp(cameraUp);
     // Move the camera around the target clockwise
     // Define the radius of the orbit in the XZ-plane (distance from the target)
-    const char* noSpin = getenv("NO_SPIN");
-    if (!noSpin && !mpServerOnly && !hasSocketRequest) {
+    if (!mpNoSpin && !mpServerOnly && !hasSocketRequest) {
         radius += 380;
         mCamera.pos().set(
             // Set the camera's position using the sin and cos functions to move it in a circle around the target

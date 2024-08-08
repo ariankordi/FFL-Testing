@@ -512,8 +512,9 @@ void Shader::bindBodyShader(FFLiCharInfo* pCharInfo)
     setCulling(FFL_CULL_MODE_BACK);
 
     // set body uniforms
-    // not the nwf light direction but eh
-    mBodyShader.setUniform(cLightDir.x, cLightDir.y, cLightDir.z, 0.0f, mBodyShader.getVertexUniformLocation("lightDir"), u32(-1));
+
+    // the light direction is passed into this shader NEGATIVE?
+    mBodyShader.setUniform(-cLightDir.x, -cLightDir.y, -cLightDir.z, -0.30943f, mBodyShader.getVertexUniformLocation("lightDir"), u32(-1));
 
 
     mBodyShader.setUniform(3.0f, u32(-1), mBodyShader.getFragmentUniformLocation("SP_power"));

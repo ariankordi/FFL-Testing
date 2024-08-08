@@ -419,6 +419,10 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	if resourceTypeStr == "" {
 		resourceTypeStr = "1"
 	}
+	shaderTypeStr := query.Get("shaderType")
+	if shaderTypeStr == "" {
+		shaderTypeStr = "0"
+	}
 
 	var storeData []byte
 	var err error
@@ -596,9 +600,15 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 
 	bgColor4u8 := [4]uint8{bgColor.R, bgColor.G, bgColor.B, bgColor.A}
 
-	shaderType := 0
+
+	/*shaderType := 0
 	if resourceType > 1 {
 		shaderType = 1
+	}*/
+	shaderType, err := strconv.Atoi(shaderTypeStr)
+	if err != nil {
+		http.Error(w, "shader type is not a number", http.StatusBadRequest)
+		return
 	}
 
 	// Creating the render request

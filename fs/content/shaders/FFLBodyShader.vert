@@ -319,10 +319,12 @@ void main()
         RVar[1u].z = ((-lightDir.x) * view[0].z) + _975;
         RVar[7u].w = _979 * _961;
     }
+    v_lightDir = RVar[1u];
     // un-negative the light directions
-    vec4 lightDirTmp = vec4(-RVar[1u].x, -RVar[1u].y, -RVar[1u].z, -RVar[1u].w);
-    v_lightDir = lightDirTmp;
-    v_normal = vec4(RVar[7u].x, RVar[7u].y, RVar[7u].w, RVar[7u].w);
+    //vec4 lightDirTmp = vec4(-RVar[1u].x, -RVar[1u].y, -RVar[1u].z, -RVar[1u].w);
+    //v_lightDir = lightDirTmp;
+    //v_normal = vec4(RVar[7u].x, RVar[7u].y, RVar[7u].w, RVar[7u].w);
+    v_normal = vec4(mat3(world * view) * i_normal0, 0.0);
     if (stateVar == 0)
     {
     }

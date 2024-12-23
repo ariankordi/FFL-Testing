@@ -31,6 +31,7 @@ RootTask::RootTask()
 #endif
 
 #include <nn/ffl/FFLiMiiData.h>
+#include <nn/ffl/FFLDatabase.h>
 
 #if RIO_IS_WIN
 
@@ -292,8 +293,17 @@ void RootTask::createModel_() {
 
     RIO_LOG("mMiiCounter: %d\n", mMiiCounter);
 
+#ifdef USE_RANDOM_MIIS
+    FFLiCharInfo charInfoRandom;
+    FFLiGetRandomCharInfo(&charInfoRandom, FFL_GENDER_FEMALE, FFL_AGE_ADULT, FFL_RACE_WHITE);
+    modelSource.dataSource = FFL_DATA_SOURCE_DIRECT_POINTER;
+                             // needed bc the mii id is null
+    modelSource.index = 0;
+    modelSource.pBuffer = &charInfoRandom;
+#else
+
     // default model source if there is no socket
-    #if RIO_IS_CAFE
+    /*#if RIO_IS_CAFE
         // use mii maker database on wii u
         modelSource.dataSource = FFL_DATA_SOURCE_OFFICIAL;
         // NOTE: will only use first 6 miis from mii maker database
@@ -306,21 +316,21 @@ void RootTask::createModel_() {
         // limit current counter by the amount of custom miis
         maxMiis = static_cast<int>(mStoreDataArray.size());
     } else {
-        // default mii source, otherwise known as guest miis
+      */  // default mii source, otherwise known as guest miis
         modelSource.dataSource = FFL_DATA_SOURCE_DEFAULT;
         // guest miis are defined in FFLiDatabaseDefault.cpp
         // fetched from m_MiiDataOfficial, derived from the static array MII_DATA_CORE_RFL
-    #endif
+    //#endif
         modelSource.index = mMiiCounter;
         modelSource.pBuffer = NULL;
-    #if !RIO_IS_CAFE
+    /*#if !RIO_IS_CAFE
     }
     #endif
-
+*/
     // limit current counter by the amount
     // of max miis (6 for default/guest miis)
     mMiiCounter = (mMiiCounter + 1) % maxMiis;
-
+#endif
 
     Model::InitArgStoreData arg = {
         .desc = {

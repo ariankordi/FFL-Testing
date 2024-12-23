@@ -67,7 +67,8 @@ CFLAGS	:=	-Wall -Wno-missing-include-dirs -Wundef -Wredundant-decls -Wcast-align
 
 CFLAGS	+=	$(INCLUDE) -D__WIIU__ -D__WUT__ \
 			-DRIO_DEBUG \
-			-DRIO_CAFE_MAIN_FILE_DEVICE_AS_CONTENT
+			-DRIO_CAFE_MAIN_FILE_DEVICE_AS_CONTENT \
+                        -DUSE_RANDOM_MIIS
 
 CXXFLAGS	:= $(CFLAGS) -std=c++17
 

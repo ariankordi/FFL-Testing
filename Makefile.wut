@@ -50,8 +50,12 @@ SOURCES		:=	./rio/src \
 				./rio/src/math/impl \
 				./rio/src/task \
 				./ffl/src \
-				./ffl/src/detail
+				./ffl/src/detail# \
+				#src
 DATA		:=	data
+INCLUDES	:=	./rio/include \
+				include \
+				./ffl/include
 CONTENT		:=	fs/content
 ICON		:=
 TV_SPLASH	:=

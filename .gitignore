@@ -16,7 +16,7 @@
 *.dll
 
 # Fortran module files
-*.mod
+#*.mod  # go
 *.smod
 
 # Compiled Static libraries
@@ -45,7 +45,7 @@ __pycache__/
 *$py.class
 
 # binaries
-ffl_testing_2_debug*
+ffl_testing_2*
 # mlc
 sys/
 usr/
@@ -54,7 +54,8 @@ FFLRes*.dat
 # renderdoc captures
 *.cap
 # misc
-*swp
+*.swp
+*.kate-swp
 .DS_Store
 
 # visual studio
@@ -62,3 +63,11 @@ FFLRes*.dat
 FFL-Testing/
 *.pdb
 *.user
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+build
+#Makefile
+cmake_install.cmake

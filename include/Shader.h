@@ -46,7 +46,7 @@ private:
     void setModulateMode_(FFLModulateMode mode);
     void setModulate_(const FFLModulateParam& modulateParam);
 
-    void setMaterial_(const FFLDrawParam& drawParam);
+    void setMaterial_(const FFLModulateType modulateType);
 
     void draw_(const FFLDrawParam& draw_param);
     static void drawCallback_(void* p_obj, const FFLDrawParam* draw_param);
@@ -57,7 +57,7 @@ private:
 private:
     enum VertexUniform
     {
-        VERTEX_UNIFORM_IT = 0,  // Inverse transpose of MV
+        VERTEX_UNIFORM_IT = 0,  // Inverse transpose / normal matrix
         VERTEX_UNIFORM_MV,
         VERTEX_UNIFORM_PROJ,
         VERTEX_UNIFORM_MAX
@@ -81,6 +81,7 @@ private:
         PIXEL_UNIFORM_MODE,
         PIXEL_UNIFORM_RIM_COLOR,
         PIXEL_UNIFORM_RIM_POWER,
+        PIXEL_UNIFORM_PARAMETER_MODE,
         PIXEL_UNIFORM_MAX
     };
 

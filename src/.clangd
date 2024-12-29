@@ -9,6 +9,9 @@ CompileFlags:
     - "-DRIO_DEBUG"
     # static asserts will be ignored
     - "-DNDEBUG"
+    - "-Wall"
+    - "-Wextra"
+    - "-Wno-missing-braces"
     - "-I../ffl/include"
     - "-I../include"
     - "-Iinclude"

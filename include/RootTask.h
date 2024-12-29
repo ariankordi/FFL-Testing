@@ -23,6 +23,7 @@ private:
     void calc_() override;
     void exit_() override;
 
+    void loadResourceFiles_();
     void createModel_();
     void createModel_(char (*buf)[FFLICHARINFO_SIZE]);
 #if RIO_IS_WIN
@@ -33,9 +34,9 @@ private:
 private:
     bool                mInitialized;
     bool                mSocketIsListening;
-    #if RIO_IS_WIN
+#if RIO_IS_WIN
     std::vector<std::vector<char>> mStoreDataArray;
-    #endif
+#endif
     FFLResourceDesc     mResourceDesc;
     Shader              mShader;
     rio::BaseMtx44f     mProjMtx;

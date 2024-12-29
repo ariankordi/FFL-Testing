@@ -39,6 +39,7 @@ void main()
     gl_Position = u_proj * u_mv * a_position;
     v_position = u_mv * a_position;
 
+    v_texCoord = a_texCoord;
     // 法線も変換
     //v_normal = mat3(inverse(u_mv)) * a_normal;
     v_normal = normalize(u_it * a_normal);
@@ -51,7 +52,7 @@ void main()
 //#endif
 
      // その他の情報も書き出す
-    v_texCoord = a_texCoord;
+    //v_tangent = mat3(u_mv) * a_tangent;
     v_tangent = normalize(u_it * a_tangent);
     v_color = a_color;
 }

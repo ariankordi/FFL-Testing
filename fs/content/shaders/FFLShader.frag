@@ -47,6 +47,11 @@ precision mediump float;
 #define FFL_COORDINATE_MODE_NONE   0
 #define FFL_COORDINATE_MODE_NORMAL 1
 
+// Custom:
+#define FFL_PARAMETER_MODE_COLOR     0 // use v_color
+#define FFL_PARAMETER_MODE_DEFAULT_1 1 // 1.0, 1.0, 0.0, 1.0
+#define FFL_PARAMETER_MODE_DEFAULT_2 2 // 0.0, 1.0, 0.0, 1.0
+
 //
 //  関数の定義ファイル
 //
@@ -161,7 +166,6 @@ uniform mediump vec4  u_const3; ///< constカラー3
 uniform mediump vec4 u_light_ambient;  ///< カメラ空間のライト方向
 uniform mediump vec4 u_light_diffuse;  ///< 拡散光用ライト
 uniform mediump vec3 u_light_dir;
-uniform bool u_light_enable;
 uniform mediump vec4 u_light_specular; ///< 鏡面反射用ライト強度
 
 /// マテリアル設定
@@ -171,12 +175,16 @@ uniform mediump vec4 u_material_specular;        ///< 鏡面反射用マテリ�
 uniform int u_material_specular_mode;            ///< スペキュラの反射モード(CharModelに依存する設定のためub_modulateにしている)
 uniform mediump float u_material_specular_power; ///< スペキュラの鋭さ(0.0を指定すると頂点カラーの設定が利用される)
 
+uniform bool u_light_enable;
 /// 変調設定
 uniform int u_mode;   ///< 描画モード
 
+// Custom:
+uniform mediump int u_parameter_mode;
+
 /// リム設定
-uniform mediump vec4  u_rim_color;
 uniform mediump float u_rim_power;
+uniform mediump vec4  u_rim_color;
 
 // サンプラー
 uniform sampler2D s_texture;
@@ -189,8 +197,18 @@ void main()
 {
     mediump vec4 color;
 
+    mediump vec4 parameter = v_color;
+    if(u_parameter_mode == FFL_PARAMETER_MODE_DEFAULT_1)
+    {
+        parameter = vec4(1.0, 1.0, 0.0, 1.0);
+    }
+    else if(u_parameter_mode == FFL_PARAMETER_MODE_DEFAULT_2)
+    {
+        parameter = vec4(0.0, 1.0, 0.0, 1.0);
+    }
+
     mediump float specularPower    = u_material_specular_power;
-    mediump float rimWidth         = v_color.a;
+    mediump float rimWidth         = parameter.a;
 
 //#ifdef FFL_MODULATE_MODE_CONSTANT
     if(u_mode == FFL_MODULATE_MODE_CONSTANT)
@@ -228,6 +246,12 @@ void main()
     }
 //#endif
 
+    // avoids little outline around mask elements
+    if(u_mode != FFL_MODULATE_MODE_CONSTANT && color.a == 0.0f)
+    {
+        discard;
+    }
+
 //#ifdef FFL_LIGHT_MODE_ENABLE
     if(u_light_enable)
     {
@@ -251,7 +275,7 @@ void main()
 
         /// Specularの値を確保する変数を宣言
         mediump float reflection;
-        mediump float strength = v_color.g;
+        mediump float strength = parameter.g; // forced to 1.0 for blinn below
         if(u_material_specular_mode == 0)
         {
             /// Blinnモデルの場合
@@ -260,9 +284,10 @@ void main()
         }
         else
         {
+            mediump float specularMix = parameter.r;
             /// Aisoモデルの場合
             mediump float specularAniso = calculateAnisotropicSpecular(u_light_dir, v_tangent, eye, u_material_specular_power);
-            reflection = calculateSpecularBlend(v_color.r, specularBlinn, specularAniso);
+            reflection = calculateSpecularBlend(specularMix, specularBlinn, specularAniso);
         }
         /// Specularの色を取得
         mediump vec3 specular = calculateSpecularColor(u_light_specular.xyz, u_material_specular.xyz, reflection, strength);

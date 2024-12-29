@@ -174,7 +174,8 @@ void Model::drawXluSpecial_()
 bool Model::initializeCpu_()
 {
     mInitializeCpuResult = FFLInitCharModelCPUStep(mpCharModel, &mCharModelSource, &mCharModelDesc);
-    if (mInitializeCpuResult != FFL_RESULT_OK) {
+    if (mInitializeCpuResult != FFL_RESULT_OK)
+    {
         RIO_LOG("FFLInitCharModelCPUStep returned: %i\n", mInitializeCpuResult);
         return false;
     }

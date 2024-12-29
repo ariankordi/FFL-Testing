@@ -14,7 +14,7 @@ INCLUDES := -Irio/include -Iffl/include -Iinclude $(INCLUDES)
 # FFL_NO_FS: just means that, on top of no db, we will open and provide the resource file ourselves
 
 # TODO: neeeed a good way to set debug and release!!!
-DEFS := -DRIO_DEBUG -DRIO_NO_CONTROLLERS_WIN -DFFL_NO_FS -DFFL_NO_DATABASE_FILE -DFFL_NO_MIDDLE_DB -DFFL_NO_DATABASE_RANDOM -DFFL_NO_DRAW_MASK_TWICE $(DEFS)
+DEFS := -DRIO_DEBUG -DRIO_NO_CONTROLLERS_WIN -DFFL_NO_FS -DFFL_NO_DATABASE_FILE -DFFL_NO_MIDDLE_DB -DFFL_NO_DATABASE_RANDOM $(DEFS)
 
 # Binary name which you can change if you want
 EXEC := ffl_testing_2_debug64
@@ -99,7 +99,7 @@ CXXFLAGS := -g -std=c++17 -Wall -Wno-unused-private-field -Wno-missing-braces $(
 # glob all files in here for now
 ifeq (,$(findstring FFL_NO_NINTEXUTILS, $(DEFS)))
 # then FFL_NO_NINTEXUTILS is NOT defined
-NINTEXUTILS_SRC := $(shell find ninTexUtils/src/ninTexUtils -name '*.c' -o -name '*.cpp')
+NINTEXUTILS_SRC := ninTexUtils/src/ninTexUtils/gx2/gx2Surface.cpp ninTexUtils/src/ninTexUtils/gx2/tcl/addrlib.cpp
 endif
 RIO_SRC := $(shell find rio/src -name '*.cpp')
 FFL_SRC := $(shell find ffl/src -name '*.cpp')

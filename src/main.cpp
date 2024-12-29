@@ -11,8 +11,13 @@
 
 static const rio::InitializeArg cInitializeArg = {
     .window = {
+#if RIO_IS_CAFE
+        .width = 1280,
+        .height = 720,
+#else
         .width = 600,
         .height = 600,
+#endif // RIO_IS_CAFE
 #if RIO_IS_WIN
         .resizable = true
 #endif // RIO_IS_WIN
@@ -22,7 +27,8 @@ static const rio::InitializeArg cInitializeArg = {
 
 #ifdef __EMSCRIPTEN__
 rio::Window* window;
-void mainLoop() {
+void mainLoop()
+{
     // Main loop iteration
     // Update the task manager
     rio::TaskMgr::instance()->calc();

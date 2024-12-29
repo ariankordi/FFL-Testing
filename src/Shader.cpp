@@ -1,4 +1,3 @@
-#include "nn/ffl/FFLModulateParam.h"
 #include <Shader.h>
 
 #include <gpu/rio_RenderState.h>
@@ -61,9 +60,11 @@ const rio::BaseVec4f& getColorUniform(const FFLColor& color)
     return reinterpret_cast<const rio::BaseVec4f&>(color.r);
 }
 
-void safeNormalizeVec3(rio::BaseVec3f* vec) {
+void safeNormalizeVec3(rio::BaseVec3f* vec)
+{
     float magnitude = std::sqrt(vec->x * vec->x + vec->y * vec->y + vec->z * vec->z);
-    if (magnitude != 0.0f) {
+    if (magnitude != 0.0f)
+    {
         vec->x /= magnitude;
         vec->y /= magnitude;
         vec->z /= magnitude;
@@ -73,13 +74,18 @@ void safeNormalizeVec3(rio::BaseVec3f* vec) {
     vec->y = std::fmax(std::fmin(vec->y, 1.0f), -1.0f);
     vec->z = std::fmax(std::fmin(vec->z, 1.0f), -1.0f);
 
-    if (vec->x == 1.0f || vec->x == -1.0f) {
+    if (vec->x == 1.0f || vec->x == -1.0f)
+    {
         vec->y = 0.0f;
         vec->z = 0.0f;
-    } else if (vec->y == 1.0f || vec->y == -1.0f) {
+    }
+    else if (vec->y == 1.0f || vec->y == -1.0f)
+    {
         vec->x = 0.0f;
         vec->z = 0.0f;
-    } else if (vec->z == 1.0f || vec->z == -1.0f) {
+    }
+    else if (vec->z == 1.0f || vec->z == -1.0f)
+    {
         vec->x = 0.0f;
         vec->y = 0.0f;
     }
@@ -87,31 +93,37 @@ void safeNormalizeVec3(rio::BaseVec3f* vec) {
 
 void gramSchmidtOrthonormalizeMtx34(rio::BaseMtx34f* mat)
 {
-    rio::BaseVec3f c0, c0Normalized, c1, c1Normalized, c1New, c2New;
-
     // Extract and normalize the first column
-    c0.x = mat->m[0][0];
-    c0.y = mat->m[1][0];
-    c0.z = mat->m[2][0];
-    c0Normalized = c0;
+    rio::BaseVec3f c0 = {
+        mat->m[0][0],
+        mat->m[1][0],
+        mat->m[2][0]
+    };
+    rio::BaseVec3f c0Normalized = c0;
     safeNormalizeVec3(&c0Normalized);
 
     // Extract and normalize the second column
-    c1.x = mat->m[0][1];
-    c1.y = mat->m[1][1];
-    c1.z = mat->m[2][1];
-    c1Normalized = c1;
+    rio::BaseVec3f c1 = {
+        mat->m[0][1],
+        mat->m[1][1],
+        mat->m[2][1]
+    };
+    rio::BaseVec3f c1Normalized = c1;
     safeNormalizeVec3(&c1Normalized);
 
     // Compute the third column as the cross product of the first two normalized columns
-    c2New.x = c0Normalized.y * c1Normalized.z - c0Normalized.z * c1Normalized.y;
-    c2New.y = c0Normalized.z * c1Normalized.x - c0Normalized.x * c1Normalized.z;
-    c2New.z = c0Normalized.x * c1Normalized.y - c0Normalized.y * c1Normalized.x;
+    rio::BaseVec3f c2New = {
+        c0Normalized.y * c1Normalized.z - c0Normalized.z * c1Normalized.y,
+        c0Normalized.z * c1Normalized.x - c0Normalized.x * c1Normalized.z,
+        c0Normalized.x * c1Normalized.y - c0Normalized.y * c1Normalized.x
+    };
 
     // Compute the new second column as the cross product of the third column and the first normalized column
-    c1New.x = c2New.y * c0Normalized.z - c2New.z * c0Normalized.y;
-    c1New.y = c2New.z * c0Normalized.x - c2New.x * c0Normalized.z;
-    c1New.z = c2New.x * c0Normalized.y - c2New.y * c0Normalized.x;
+    rio::BaseVec3f c1New = {
+        c2New.y * c0Normalized.z - c2New.z * c0Normalized.y,
+        c2New.z * c0Normalized.x - c2New.x * c0Normalized.z,
+        c2New.x * c0Normalized.y - c2New.y * c0Normalized.x
+    };
 
     // Update the matrix with the new orthonormal columns
     mat->m[0][0] = c0Normalized.x;
@@ -207,7 +219,7 @@ const FFLColor cLightAmbient  = { 0.73f, 0.73f, 0.73f, 1.0f };
 const FFLColor cLightDiffuse  = { 0.60f, 0.60f, 0.60f, 1.0f };
 const FFLColor cLightSpecular = { 0.70f, 0.70f, 0.70f, 1.0f };
 
-const rio::BaseVec3f cLightDir = { -0.4531539381f, 0.4226179123f, 0.7848858833f };
+const rio::BaseVec3f cLightDir = { -0.4531539381f, 0.4226179123f, 0.7848858833f }; // , 0.30943f
 // nwf light direction but doesn't seem to differ much
 //const rio::BaseVec3f cLightDir = { -0.455f, 0.348f, 0.5f };
 
@@ -224,6 +236,7 @@ Shader::Shader()
     : mVBOHandle()
     , mVAOHandle()
 #endif
+    , mCallback()
 {
     rio::MemUtil::set(mVertexUniformLocation, u8(-1), sizeof(mVertexUniformLocation));
     rio::MemUtil::set(mPixelUniformLocation, u8(-1), sizeof(mPixelUniformLocation));
@@ -274,13 +287,34 @@ void Shader::initialize()
     mPixelUniformLocation[PIXEL_UNIFORM_MODE]                       = mShader.getFragmentUniformLocation("u_mode");
     mPixelUniformLocation[PIXEL_UNIFORM_RIM_COLOR]                  = mShader.getFragmentUniformLocation("u_rim_color");
     mPixelUniformLocation[PIXEL_UNIFORM_RIM_POWER]                  = mShader.getFragmentUniformLocation("u_rim_power");
+    // Custom uniform to set values previously handled by v_color if the color attribute is constant (stride = 0).
+    mPixelUniformLocation[PIXEL_UNIFORM_PARAMETER_MODE]             = mShader.getFragmentUniformLocation("u_parameter_mode");
 
     mSamplerLocation = mShader.getFragmentSamplerLocation("s_texture");
 
     mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_POSITION]  = mShader.getVertexAttribLocation("a_position");
-    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD]  = mShader.getVertexAttribLocation("a_texCoord");
+    // 2D planes (faceline/mask) do not have anything but position and texcoord
     mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL]    = mShader.getVertexAttribLocation("a_normal");
+    // hair does not have texcoord
+    mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD] = mShader.getVertexAttribLocation("a_texCoord");
+    /* NOTE: "color" is not meant as an actual color... it is
+     * only here as parameters to control the anisotropic effect
+     * color.r - aniso specular blend, param 1 to calculateSpecularBlend
+                 (switch SampleShader: "specularMix" in vertex shader)
+     * color.g - aniso specular strength, param 4 to calculateSpecularColor
+                 (for blinn they force it to 1.0)
+     * color.b - unused and set to 0
+     * color.a - rim lighting width "rimWidth", param 3 into calculateRimColor
+                 (when rim lighting is not active, usually the reason is that A is 0 here)
+
+     * color's stride is 0 and size is 4 on everything else, suggesting it is constant
+
+     * in the FFL resource on Wii U, all shapes where color's stride is 0 use the value: <1, 1, 0, 1>
+     * ... EXCEPT for where R is 0 in: hair type 34/beanie, and hair
+     *              for hat meshes: 18, 23, 34, 39, 45, 57, 114, 127
+     */
     mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_COLOR]     = mShader.getVertexAttribLocation("a_color");
+    // tangent is only set on hair, size and stride are 0 on everything else
     mAttributeLocation[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT]   = mShader.getVertexAttribLocation("a_tangent");
 
 #if RIO_IS_CAFE
@@ -331,8 +365,8 @@ void Shader::initialize()
 #endif
 
     mSampler.setWrap(rio::TEX_WRAP_MODE_MIRROR, rio::TEX_WRAP_MODE_MIRROR, rio::TEX_WRAP_MODE_MIRROR);
-    mSampler.setLOD(-1000.0f, 1000.0f, 0.0f);
-    mSampler.setFilter(rio::TEX_XY_FILTER_MODE_LINEAR, rio::TEX_XY_FILTER_MODE_LINEAR, rio::TEX_MIP_FILTER_MODE_NONE, rio::TEX_ANISO_1_TO_1);
+
+    mSampler.setFilter(rio::TEX_XY_FILTER_MODE_LINEAR, rio::TEX_XY_FILTER_MODE_LINEAR, rio::TEX_MIP_FILTER_MODE_LINEAR, rio::TEX_ANISO_1_TO_1);
 
     mCallback.pObj = this;
     mCallback.pApplyAlphaTestFunc = &Shader::applyAlphaTestCallback_;
@@ -431,7 +465,7 @@ void Shader::bindTexture_(const FFLModulateParam& modulateParam)
 {
     if (modulateParam.pTexture2D != nullptr)
     {
-        mSampler.linkTexture2D(modulateParam.pTexture2D);
+        mSampler.linkTexture2D(reinterpret_cast<const rio::Texture2D*>(modulateParam.pTexture2D));
         mSampler.tryBindFS(mSamplerLocation, 0);
     }
 #ifdef __EMSCRIPTEN__
@@ -455,7 +489,8 @@ void Shader::setModulateMode_(FFLModulateMode mode)
 
 void Shader::setModulate_(const FFLModulateParam& modulateParam)
 {
-    setModulateMode_(modulateParam.mode);
+    setModulateMode_(modulateParam.mode); // Modulate mode
+    setMaterial_(modulateParam.type); // Material shader uniforms
 
     // if you want to change colors based on modulateParam.type
     // FFL_MODULATE_TYPE_SHAPE_HAIR
@@ -484,19 +519,17 @@ void Shader::setModulate_(const FFLModulateParam& modulateParam)
     bindTexture_(modulateParam);
 }
 
-void Shader::setMaterial_(const FFLDrawParam& drawParam)
+void Shader::setMaterial_(const FFLModulateType modulateType)
 {
-    if (drawParam.modulateParam.type >= cMaterialParamSize)
+    if (modulateType >= cMaterialParamSize)
         return;
 
-    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].ambient), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_AMBIENT]);
-    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].diffuse), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_DIFFUSE]);
-    mShader.setUniform(getColorUniform(cMaterialParam[drawParam.modulateParam.type].specular), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR]);
-    mShader.setUniform(cMaterialParam[drawParam.modulateParam.type].specularPower, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER]);
+    mShader.setUniform(getColorUniform(cMaterialParam[modulateType].ambient), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_AMBIENT]);
+    mShader.setUniform(getColorUniform(cMaterialParam[modulateType].diffuse), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_DIFFUSE]);
+    mShader.setUniform(getColorUniform(cMaterialParam[modulateType].specular), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR]);
+    mShader.setUniform(cMaterialParam[modulateType].specularPower, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_POWER]);
 
-    s32 materialSpecularMode = cMaterialParam[drawParam.modulateParam.type].specularMode;
-    if (drawParam.attributeBufferParam.attributeBuffers[FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT].ptr == nullptr)
-        materialSpecularMode = 0;
+    s32 materialSpecularMode = cMaterialParam[modulateType].specularMode;
 
     mShader.setUniform(materialSpecularMode, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE]);
 }
@@ -505,7 +538,6 @@ void Shader::draw_(const FFLDrawParam& draw_param)
 {
     setCulling(draw_param.cullMode);
     setModulate_(draw_param.modulateParam);
-    setMaterial_(draw_param);
 
     if (draw_param.primitiveParam.pIndexBuffer != nullptr)
     {
@@ -533,7 +565,7 @@ void Shader::draw_(const FFLDrawParam& draw_param)
             s32 location = mAttributeLocation[type];
             void* ptr = buffer.ptr;
 
-            if (ptr && location != -1 && buffer.stride > 0)
+            if (ptr && location != -1) // only color's stride is 0
             {
 
                 u32 stride = buffer.stride;
@@ -561,14 +593,26 @@ void Shader::draw_(const FFLDrawParam& draw_param)
                     RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_BYTE, true, stride, nullptr));
                     break;
                 case FFL_ATTRIBUTE_BUFFER_TYPE_COLOR:
+                    if (stride == 0 && size == 4) // If color's stride is 0, its value is constant.
+                    {
+                        RIO_GL_CALL(glDisableVertexAttribArray(location)); // Attribute will not be used.
+                        // Dereference the first value as u8.
+                        const u8* color = reinterpret_cast<u8*>(ptr);
+                        if (color[0] == 0) // Only possibilities for first component are 0 or 1 (read above).
+                            mShader.setUniform(2, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_PARAMETER_MODE]); // FFL_PARAMETER_MODE_DEFAULT_2
+                        else
+                            mShader.setUniform(1, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_PARAMETER_MODE]); // FFL_PARAMETER_MODE_DEFAULT_1
+                        break; // Break out of the switch case.
+                    }
+                    mShader.setUniform(0, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_PARAMETER_MODE]); // FFL_PARAMETER_MODE_COLOR
                     RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_UNSIGNED_BYTE, true, stride, nullptr));
                     break;
                 default:
                     break;
                 }
             }
-            else if (location != -1)
-                // Disable the attribute to avoid using uninitialized data
+
+            else if (location != -1) // Disable attributes without corresponding VS inputs.
                 RIO_GL_CALL(glDisableVertexAttribArray(location));
         }
 #endif

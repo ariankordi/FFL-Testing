@@ -87,7 +87,7 @@ if(RIO_USE_GLEW) # Use GLEW as an alternative to GLAD.
     # Find OpenGL library as well.
     find_package(OpenGL REQUIRED)
     if(NOT OpenGL_FOUND)
-        message(FATAL_ERROR "OpenGL development was not found, and this is needed for GLEW. Please install it for your system (e.g., libgl-dev) or simply omit RIO_USE_GLEW.")
+        message(FATAL_ERROR "OpenGL library was not found, and this is needed for GLEW. Please install the development package for your system (e.g., libgl-dev) or simply omit RIO_USE_GLEW.")
     endif()
 endif()
 

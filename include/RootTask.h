@@ -77,7 +77,7 @@ private:
 
     void initializeShaders_()
     {
-        for (int type = 0; type < SHADER_TYPE_MAX; type++)
+        for (s32 type = 0; type < SHADER_TYPE_MAX; type++)
         {
             switch (type)
             {

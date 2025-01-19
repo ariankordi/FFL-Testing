@@ -70,7 +70,8 @@ public:
     }
 
     // Data structures to collect the mesh data
-    struct MeshData {
+    struct MeshData
+    {
         std::vector<float> positions;        ///< Vertex positions (x, y, z)
         std::vector<float> normals;          ///< Vertex normals (x, y, z)
         std::vector<float> texcoords;        ///< Vertex texture coordinates (u, v)

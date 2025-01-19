@@ -3,7 +3,8 @@
 
 // Enums included in RenderRequest.
 
-enum MiiDataInputType {
+enum MiiDataInputType
+{
     INPUT_TYPE_FFL_MIIDATACORE,
     INPUT_TYPE_FFL_STOREDATA,
     INPUT_TYPE_RFL_CHARDATA,
@@ -17,7 +18,8 @@ enum MiiDataInputType {
     //INPUT_TYPE_RFL_CHARDATA_LE
 };
 
-enum ShaderType {
+enum ShaderType
+{
     SHADER_TYPE_WIIU,
     SHADER_TYPE_SWITCH,
     SHADER_TYPE_MIITOMO,
@@ -32,7 +34,8 @@ enum ShaderType {
     SHADER_TYPE_MAX,
 };
 
-enum BodyType {
+enum BodyType
+{
     BODY_TYPE_DEFAULT_FOR_SHADER = -1, // Will be replaced
     BODY_TYPE_WIIU_MIIBODYMIDDLE = 0,
     BODY_TYPE_SWITCH_MIIBODYHIGH = 1,
@@ -60,14 +63,16 @@ const PantsColor cShaderTypeDefaultPantsType[SHADER_TYPE_MAX] = {
     PANTS_COLOR_SAME_AS_BODY, // SHADER_TYPE_WIIU_FFLICONWITHBODY
 };
 
-enum InstanceRotationMode {
+enum InstanceRotationMode
+{
     INSTANCE_ROTATION_MODE_MODEL,
     INSTANCE_ROTATION_MODE_CAMERA,
     INSTANCE_ROTATION_MODE_EXPRESSION, // neewwww
     INSTANCE_ROATATION_MODE_MAX,
 };
 
-enum SplitMode {
+enum SplitMode
+{
     SPLIT_MODE_NONE,
     SPLIT_MODE_FRONT,
     SPLIT_MODE_BACK,
@@ -75,7 +80,8 @@ enum SplitMode {
     SPLIT_MODE_MAX
 };
 
-enum ViewType {
+enum ViewType
+{
     VIEW_TYPE_FACE,  // head with body
     VIEW_TYPE_FACE_ONLY,  // head only
     VIEW_TYPE_ALL_BODY,
@@ -86,7 +92,8 @@ enum ViewType {
     VIEW_TYPE_ALL_BODY_SUGAR,
 };
 
-enum DrawStageMode {
+enum DrawStageMode
+{
     DRAW_STAGE_MODE_ALL,
     DRAW_STAGE_MODE_OPA_ONLY,
     DRAW_STAGE_MODE_XLU_ONLY,
@@ -94,7 +101,8 @@ enum DrawStageMode {
     DRAW_STAGE_MODE_XLU_DEPTH_MASK,
 };
 
-enum ResponseFormat {
+enum ResponseFormat
+{
     RESPONSE_FORMAT_TGA_DEFAULT,     // with tga header
     RESPONSE_FORMAT_GLTF_MODEL,      // glTF model export
     RESPONSE_FORMAT_TGA_BGRA_FLIP_Y, // RIO_IS_WIN only

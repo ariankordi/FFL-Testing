@@ -11,7 +11,8 @@
 
 // Structure representing a render request, derived from
 // request query parameters by caller (web server).
-PACKED(struct RenderRequest {
+PACKED(struct RenderRequest
+{
     uint8_t  data[96];       // just a buffer that accounts for maximum size
     uint16_t dataLength;     // determines the mii data format
     uint8_t  modelFlag;      // FFLModelType + nose flatten @ bit 4

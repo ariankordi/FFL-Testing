@@ -28,14 +28,14 @@ I keep telling myself that, after a rewrite, it can be moved into its own repo, 
 
 
 * .. My only solution is to run multiple processes right now.
-	- This actually needs my nwf-mii-cemu-toy, ffl-renderer-proto-integrate branch.
-	- Clone it like so: `git clone -b ffl-renderer-proto-integrate https://github.com/ariankordi/nwf-mii-cemu-toy`, build and run.
+    - This actually needs my nwf-mii-cemu-toy, ffl-renderer-proto-integrate branch.
+    - Clone it like so: `git clone -b ffl-renderer-proto-integrate https://github.com/ariankordi/nwf-mii-cemu-toy`, build and run.
 * I recommend setting this up as a systemd _socket activated, instanced service._
-	- This means you can run it like so: `systemctl start ffl-testing@31100` - where 31100 is the port number, which you can change, and also enable the service to start it at boot.
-	- **You will need to rebuild, once again**, with `USE_SYSTEMD_SOCKET` as a def.
-		* If you're following along on your VPS, it's this: `CXXFLAGS="-O3 -march=native" DEFS="-DRIO_USE_OSMESA -DUSE_SYSTEMD_SOCKET" make`
-	- Edit `ffl-testing@.service`. Adjust the `WorkingDirectory`, `ExecStart` (program path), and potentially user.
-	- Copy the systemd units in this repo: `sudo cp ffl-testing@.service ffl-testing@.socket /etc/systemd/system/`
+    - This means you can run it like so: `systemctl start ffl-testing@31100` - where 31100 is the port number, which you can change, and also enable the service to start it at boot.
+    - **You will need to rebuild, once again**, with `USE_SYSTEMD_SOCKET` as a def.
+        * If you're following along on your VPS, it's this: `CXXFLAGS="-O3 -march=native" DEFS="-DRIO_USE_OSMESA -DUSE_SYSTEMD_SOCKET" make`
+    - Edit `ffl-testing@.service`. Adjust the `WorkingDirectory`, `ExecStart` (program path), and potentially user.
+    - Copy the systemd units in this repo: `sudo cp ffl-testing@.service ffl-testing@.socket /etc/systemd/system/`
 </details>
 
 
@@ -147,7 +147,7 @@ If you can't install it (not on Linux or MSYS2), or need the latest version, let
 ### GLFW3:
 * `git clone https://github.com/glfw/glfw && cd glfw`
 * `cmake -S . -B build`
-	- If you are cross compiling, append: `-D CMAKE_TOOLCHAIN_FILE=CMake/x86_64-w64-mingw32.cmake -D CMAKE_INSTALL_PREFIX=/usr/local/x86_64-w64-mingw32/`
+    - If you are cross compiling, append: `-D CMAKE_TOOLCHAIN_FILE=CMake/x86_64-w64-mingw32.cmake -D CMAKE_INSTALL_PREFIX=/usr/local/x86_64-w64-mingw32/`
 * `cmake --build build -j8`
 * (sudo) `cmake --install build`
 ### Now it should be available to pkg-config

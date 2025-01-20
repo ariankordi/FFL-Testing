@@ -9,7 +9,6 @@
 class Model
 {
 public:
-    template <typename T>
     struct InitArg
     {
         FFLCharModelDesc    desc;
@@ -17,15 +16,11 @@ public:
         u16                 index;
     };
 
-    typedef InitArg<FFLStoreData>   InitArgStoreData;
-    typedef InitArg<FFLMiddleDB>    InitArgMiddleDB;
-
 public:
     Model();
     ~Model();
 
-    template <typename T>
-    bool initialize(const InitArg<T>& arg, IShader& shader);
+    bool initialize(const InitArg& arg, IShader& shader);
 
     FFLCharModel* getCharModel() const { return mpCharModel; }
     FFLPartsTransform getPartsTransform() const
@@ -103,19 +98,3 @@ private:
     bool                mIsInitialized;
     FFLResult           mInitializeCpuResult;
 };
-
-template <typename T>
-bool Model::initialize(const InitArg<T>& arg, IShader& shader)
-{
-    RIO_ASSERT(mIsInitialized == false);
-
-    initialize_(&arg.desc, &arg.source);
-
-    if (!initializeCpu_())
-        return false;
-
-    initializeGpu_(shader);
-
-    mIsInitialized = true;
-    return true;
-}

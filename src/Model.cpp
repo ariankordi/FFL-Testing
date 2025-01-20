@@ -38,6 +38,21 @@ void Model::initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource
     mCharModelSource = *p_source;
 }
 
+bool Model::initialize(const InitArg& arg, IShader& shader)
+{
+    RIO_ASSERT(mIsInitialized == false);
+
+    initialize_(&arg.desc, &arg.source);
+
+    if (!initializeCpu_())
+        return false;
+
+    initializeGpu_(shader);
+
+    mIsInitialized = true;
+    return true;
+}
+
 void Model::updateMtxSRT_()
 {
     mMtxSRT = mMtxRT;

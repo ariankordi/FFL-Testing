@@ -302,6 +302,9 @@ FFLResourceType RootTask::getDefaultResourceType_()
 {
     // prefer high by default
     const FFLResourceType preferred = FFL_RESOURCE_TYPE_HIGH;
+#ifdef TEST_FFL_DEFAULT_RESOURCE_LOADING
+    return preferred;
+#else
     if (mResourceDesc.size[preferred])
         return preferred; // return preferred if it is there
 
@@ -312,6 +315,7 @@ FFLResourceType RootTask::getDefaultResourceType_()
 
     RIO_ASSERT(false && "no resources available...???");
     return preferred;
+#endif // TEST_FFL_DEFAULT_RESOURCE_LOADING
 }
 
 void RootTask::prepare_()
@@ -493,7 +497,7 @@ void RootTask::createModel_()
     mMiiCounter = (mMiiCounter + 1) % maxMiis;
 
 
-    Model::InitArgStoreData arg = {
+    Model::InitArg arg = {
         .desc = {
             .resolution = static_cast<FFLResolution>(FFL_RESOLUTION_TEX_256 | FFL_RESOLUTION_MIP_MAP_ENABLE_MASK),
             .allExpressionFlag = { .flags = { 1 << 0, 0, 0 } },
@@ -637,7 +641,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         resourceType = getDefaultResourceType_();
 
     // otherwise just fall through and use default
-    Model::InitArgStoreData arg = {
+    Model::InitArg arg = {
         .desc = {
             .resolution = texResolution,
             .allExpressionFlag = expressionFlag,
@@ -713,8 +717,6 @@ static void writeTGAHeaderToSocket(int socket, u32 width, u32 height, rio::Textu
     send(socket, reinterpret_cast<char*>(&header), TGA_HEADER_SIZE, 0); // send tga header
 }
 
-
-#include <BodyModel.h>
 
 rio::mdl::Model* RootTask::getBodyModel_(Model* pModel, BodyType type)
 {
@@ -1517,8 +1519,7 @@ void RootTask::calc_()
 
 #ifndef NO_GLTF
 
-#include "GLTFExportCallback.h"
-#include <sstream>
+#include <GLTFExportCallback.h>
 
 void handleGLTFRequest(RenderRequest* req, Model* pModel, int socket)
 {
@@ -1603,9 +1604,9 @@ void RootTask::exit_()
 
     FFLExit();
 
-    rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_HIGH]);
-    if (mResourceDesc.size[FFL_RESOURCE_TYPE_MIDDLE] != 0)
-      rio::MemUtil::free(mResourceDesc.pData[FFL_RESOURCE_TYPE_MIDDLE]);
+    for (u32 type = 0; type < FFL_RESOURCE_TYPE_MAX; type++)
+        if (mResourceDesc.size[type] != 0)
+            rio::MemUtil::free(mResourceDesc.pData[type]);
 
     // delete all shaders that were initialized
     for (u32 type = 0; type < SHADER_TYPE_MAX; type++)

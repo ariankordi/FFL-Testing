@@ -72,8 +72,12 @@ uniform highp   mat4 uViewMatrix;                           //!< 入力:[ 4     
 uniform mediump mat3 uNormalMatrix;                         //!< 入力:[ 3      /  3 :  11 ] モデルの法線用行列
 uniform highp   mat4 uModelMatrix;                          //!< 入力:[ 4      /  4 :  15 ] モデルのワールド変換行列
 uniform lowp    int  uBoneCount;                            //!< 入力:[ 1      /  1 :  16 ] ボーンの個数
-uniform highp   mat4 uBoneMatrices[AGX_BONE_MAX];           //!< 入力:[ 4 x 15 / 60 :  76 ] ボーンの行列配列
-uniform mediump mat3 uBoneNormalMatrices[AGX_BONE_MAX];     //!< 入力:[ 3 x 15 / 45 : 121 ] ボーンの法線行列配列
+//uniform highp   mat4 uBoneMatrices[AGX_BONE_MAX];           //!< 入力:[ 4 x 15 / 60 :  76 ] ボーンの行列配列
+//uniform mediump mat3 uBoneNormalMatrices[AGX_BONE_MAX];     //!< 入力:[ 3 x 15 / 45 : 121 ] ボーンの法線行列配列
+#define SHADER_MAX_BONE_COUNT 65
+// TODO: RENAME/RESIZE (miitomo = 65):
+uniform highp   vec4 uBoneMatrices[3 * SHADER_MAX_BONE_COUNT];
+
 uniform lowp    int  uDirLightCount;                        //!< 入力:[ 1      /  1 : 122 ] 方向ライトの数
 uniform mediump vec4 uDirLightDirAndType0;//!< 入力:[ 1 x  2 /  2 : 124 ] 平行ライトの向く方向
 uniform mediump vec4 uDirLightDirAndType1;//!< 入力:[ 1 x  2 /  2 : 124 ] 平行ライトの向く方向
@@ -125,21 +129,31 @@ void main()
     // ----------------------------------------
     if (uBoneCount >= 1)
     {
-        lowp    ivec4 boneIndex  = ivec4(aBoneIndex);   //!< ボーンのインデックス
-        mediump vec4  boneWeight = aBoneWeight;         //!< ボーンの影響度
-        
+        lowp    int boneIndex  = int(aTexcoord0.x) * 3;
+        //lowp    ivec4 boneIndex  = ivec4(aBoneIndex);   //!< ボーンのインデックス
+        //mediump vec4  boneWeight = aBoneWeight;         //!< ボーンの影響度
+        mediump vec4  boneWeight = vec4(1.0, 1.0, 1.0, 1.0);
+
         // ボーンの行列を取得する
-        highp   mat4 boneMatrix = uBoneMatrices[boneIndex.x];
-        mediump mat3 boneNormMatrix = uBoneNormalMatrices[boneIndex.x];
-        
+        highp mat4 boneMatrix = mat4(
+            vec4(uBoneMatrices[boneIndex + 0].x, uBoneMatrices[boneIndex + 1].x, uBoneMatrices[boneIndex + 2].x, 0.0),
+            vec4(uBoneMatrices[boneIndex + 0].y, uBoneMatrices[boneIndex + 1].y, uBoneMatrices[boneIndex + 2].y, 0.0),
+            vec4(uBoneMatrices[boneIndex + 0].z, uBoneMatrices[boneIndex + 1].z, uBoneMatrices[boneIndex + 2].z, 0.0),
+            vec4(uBoneMatrices[boneIndex + 0].w, uBoneMatrices[boneIndex + 1].w, uBoneMatrices[boneIndex + 2].w, 1.0)
+        );
+        //highp   mat4 boneMatrix = uBoneMatrices[boneIndex.x];
+        //mediump mat3 boneNormMatrix = uBoneNormalMatrices[boneIndex.x];
+
         // 位置と法線をあらかじめ計算しておく
         position = boneMatrix * vec4(aPosition, 1.0) * boneWeight.x;
-        normal   = boneNormMatrix * (aNormal * boneWeight.x);
+        normal   = mat3(boneMatrix) * aNormal * boneWeight.x;
+        //normal   = boneNormMatrix * (aNormal * boneWeight.x);
 #if defined(AGX_FEATURE_BUMP_TEXTURE)
-        tangent  = boneNormMatrix * (aTangent * boneWeight.x);
+        tangent  = mat3(boneMatrix) * aTangent * boneWeight.x;
+        //tangent  = boneNormMatrix * (aTangent * boneWeight.x);
 #endif
         
-        
+/*
         // 他の影響するボーンの行列を取得し、計算していく
         int iBone = 1;
         for (; iBone < uBoneCount; ++ iBone)
@@ -159,6 +173,7 @@ void main()
             tangent  += boneNormMatrix * (aTangent * boneWeight.x);
 #endif
         }
+*/
     }
     else
     {

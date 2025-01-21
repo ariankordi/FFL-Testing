@@ -66,12 +66,19 @@ layout(std140) uniform u_Matrix
 uniform mat4 mv;
 uniform mat4 proj;
 
+#define SHADER_MAX_BONE_COUNT 65
+// TODO: RENAME/RESIZE (miitomo = 65):
+uniform vec4 mtxPalette[3 * SHADER_MAX_BONE_COUNT];
+uniform int vtxSkinCount; // TODO: RENAME
+
 void main()
 {
+// SampleShader
+/*
     /// ビュー行列に変換
-    /*vec3 vPos = TRANSFORM_POS(mv,i_Position);
-    gl_Position = PROJECT(proj,vec4(vPos,1.0f));
-    */
+    //vec3 vPos = TRANSFORM_POS(mv,i_Position);
+    //gl_Position = PROJECT(proj,vec4(vPos,1.0f));
+
     gl_Position = proj * mv * i_Position;
     normal = mat3(mv) * i_Normal.xyz;
 
@@ -83,49 +90,33 @@ void main()
 #if defined(USE_DEBUG)
     gl_Position = i_Position;
 #endif
-    
-}
-/*
+*/
+    // VariableIconBodyShader
     vec4 pos_w = vec4(0, 0, 0, 1);
     vec3 nrm_w = vec3(0, 0, 0);
     vec4 tmp = vec4(i_Position.xyz, 1.0f);
     
     if (vtxSkinCount == 0)
     {
-        pos_w.x = dot(shapeMtx[0], tmp);
-        pos_w.y = dot(shapeMtx[1], tmp);
-        pos_w.z = dot(shapeMtx[2], tmp);
-        nrm_w.x = dot(shapeMtx[0].xyz, i_Normal);
-        nrm_w.y = dot(shapeMtx[1].xyz, i_Normal);
-        nrm_w.z = dot(shapeMtx[2].xyz, i_Normal);
+        pos_w.xyz = tmp.xyz;
+        nrm_w.xyz = i_Normal.xyz;
+        texCoord = i_TexCoord.xy;
     }
     else if (vtxSkinCount == 1)
     {
-        int mtxIndex = i_Index.x * 3;
+        int mtxIndex = int(i_TexCoord.x) * 3; // cast int
         pos_w.x = dot(mtxPalette[mtxIndex + 0], tmp);
         pos_w.y = dot(mtxPalette[mtxIndex + 1], tmp);
         pos_w.z = dot(mtxPalette[mtxIndex + 2], tmp);
         nrm_w.x = dot(mtxPalette[mtxIndex + 0].xyz, i_Normal);
         nrm_w.y = dot(mtxPalette[mtxIndex + 1].xyz, i_Normal);
         nrm_w.z = dot(mtxPalette[mtxIndex + 2].xyz, i_Normal);
+        texCoord = vec2(0.0, 0.0);
     }
     
-    vec4 pos_v;
-    pos_v.x = dot(cameraMtx[0], pos_w);
-    pos_v.y = dot(cameraMtx[1], pos_w);
-    pos_v.z = dot(cameraMtx[2], pos_w);
-    pos_v.w = 1.0;
+    gl_Position = proj * mv * pos_w;
 
-    gl_Position.x = dot(projMtx[0], pos_v);
-    gl_Position.y = dot(projMtx[1], pos_v);
-    gl_Position.z = dot(projMtx[2], pos_v);
-    gl_Position.w = dot(projMtx[3], pos_v);
-    
-    Out.normal.x = dot(cameraMtx[0].xyz, nrm_w);
-    Out.normal.y = dot(cameraMtx[1].xyz, nrm_w);
-    Out.normal.z = dot(cameraMtx[2].xyz, nrm_w);
-    Out.texCoord = i_TexCoord.xy;
-    Out.specularMix = i_Parameter.r;
-   
+    normal = mat3(mv) * nrm_w;
+
+    specularMix = i_Parameter.r;
 }
-*/

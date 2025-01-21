@@ -39,6 +39,8 @@ public:
         mSpecularMode = specularMode;
     }
 
+    void setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount) override;
+
     void setLightDirection(const rio::Vector3f direction) override;
 
     void setDefaultLight(const rio::Vector3f direction, const FFLColor ambient, const FFLColor diffuse, const FFLColor specular)
@@ -88,6 +90,8 @@ protected:
         VERTEX_UNIFORM_IT = 0,  // Inverse transpose / normal matrix
         VERTEX_UNIFORM_MV,
         VERTEX_UNIFORM_PROJ,
+        VERTEX_UNIFORM_MTX_PALETTE,
+        VERTEX_UNIFORM_SKIN_COUNT,
         VERTEX_UNIFORM_MAX
     };
 

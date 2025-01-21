@@ -306,6 +306,9 @@ void Shader::initialize()
     mVertexUniformLocation[VERTEX_UNIFORM_MV]   = mShader.getVertexUniformLocation("u_mv");
     mVertexUniformLocation[VERTEX_UNIFORM_PROJ] = mShader.getVertexUniformLocation("u_proj");
 
+    mVertexUniformLocation[VERTEX_UNIFORM_MTX_PALETTE] = mShader.getVertexUniformLocation("u_mtxPalette");
+    mVertexUniformLocation[VERTEX_UNIFORM_SKIN_COUNT] = mShader.getVertexUniformLocation("u_vtxSkinCount");
+
     mPixelUniformLocation[PIXEL_UNIFORM_CONST1]                     = mShader.getFragmentUniformLocation("u_const1");
     mPixelUniformLocation[PIXEL_UNIFORM_CONST2]                     = mShader.getFragmentUniformLocation("u_const2");
     mPixelUniformLocation[PIXEL_UNIFORM_CONST3]                     = mShader.getFragmentUniformLocation("u_const3");
@@ -454,6 +457,22 @@ void Shader::bind(bool light_enable, FFLiCharInfo* pCharInfo)
     // reset specular mode, parameter mode
     mShader.setUniform(FFL_SPECULAR_MODE_NORMAL, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE]);
     mShader.setUniform(1, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_PARAMETER_MODE]); // FFL_PARAMETER_MODE_DEFAULT_1
+
+    mShader.setUniform(0, mVertexUniformLocation[VERTEX_UNIFORM_SKIN_COUNT], u32(-1));
+}
+
+void Shader::setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount)
+{
+    mShader.setUniform(1, mVertexUniformLocation[VERTEX_UNIFORM_SKIN_COUNT], u32(-1));
+
+    rio::BaseVec4f mtxPalette[3 * SHADER_MAX_BONE_COUNT];
+    for (s32 i = 0; i < boneCount; i++)
+    {
+        const s32 mtxIndex = i * 3;
+        for (s32 j = 0; j < 3; j++)
+            mtxPalette[mtxIndex + j] = mtx[i].v[j];
+    }
+    mShader.setUniformArray(boneCount * 3, mtxPalette, mVertexUniformLocation[VERTEX_UNIFORM_MTX_PALETTE], u32(-1));
 }
 
 #ifdef FFL_USE_ADJUST_MTX

@@ -27,6 +27,8 @@ public:
     }
     void setModulatePantsMaterial(PantsColor pantsColor) override;
 
+    void setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount) override;
+
     void setLightDirection(const rio::Vector3f direction) override;
 
     void applyAlphaTestEnable() const override
@@ -66,6 +68,8 @@ private:
     {
         VERTEX_UNIFORM_MV = 0,
         VERTEX_UNIFORM_PROJ,
+        VERTEX_UNIFORM_MTX_PALETTE,
+        VERTEX_UNIFORM_SKIN_COUNT,
         VERTEX_UNIFORM_MAX
     };
 

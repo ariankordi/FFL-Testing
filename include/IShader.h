@@ -11,6 +11,8 @@
 
 #define CUSTOM_MATERIAL_PARAM_SIZE  CUSTOM_MATERIAL_PARAM_PANTS + 1
 
+#define SHADER_MAX_BONE_COUNT 65
+
 #include <PantsColor.h> // make available to shaders
 
 class IShader
@@ -25,6 +27,7 @@ public:
     virtual void setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const = 0;
     virtual void resetUniformsToDefault() = 0;
     virtual void setLightDirection(rio::Vector3f direction) = 0;
+    virtual void setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount) = 0;
     virtual void applyAlphaTest(bool enable, rio::Graphics::CompareFunc func, f32 ref) const = 0;
     virtual void applyAlphaTestEnable() const = 0;
     virtual void applyAlphaTestDisable() const = 0;

@@ -446,6 +446,9 @@ void ShaderSwitch::initialize()
     mVertexUniformLocation[VERTEX_UNIFORM_MV]   = mShader.getVertexUniformLocation("mv");
     mVertexUniformLocation[VERTEX_UNIFORM_PROJ] = mShader.getVertexUniformLocation("proj");
 
+    mVertexUniformLocation[VERTEX_UNIFORM_MTX_PALETTE] = mShader.getVertexUniformLocation("mtxPalette");
+    mVertexUniformLocation[VERTEX_UNIFORM_SKIN_COUNT] = mShader.getVertexUniformLocation("vtxSkinCount");
+
     mPixelUniformLocation[PIXEL_UNIFORM_MODULATE_TYPE]                     = mShader.getFragmentUniformLocation("modulateType");
     mPixelUniformLocation[PIXEL_UNIFORM_GAMMA_TYPE]                     = mShader.getFragmentUniformLocation("gammaType");
     mPixelUniformLocation[PIXEL_UNIFORM_DRAW_TYPE]                     = mShader.getFragmentUniformLocation("drawType");
@@ -578,6 +581,21 @@ void ShaderSwitch::bind(bool light_enable, FFLiCharInfo* pCharInfo)
     mShader.setUniform(mLightDir, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_DIR_IN_VIEW]);
     mShader.setUniform(cLightColor, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_COLOR]);
 
+    mShader.setUniform(0, mVertexUniformLocation[VERTEX_UNIFORM_SKIN_COUNT], u32(-1));
+}
+
+void ShaderSwitch::setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount)
+{
+    mShader.setUniform(1, mVertexUniformLocation[VERTEX_UNIFORM_SKIN_COUNT], u32(-1));
+
+    rio::BaseVec4f mtxPalette[3 * SHADER_MAX_BONE_COUNT];
+    for (s32 i = 0; i < boneCount; i++)
+    {
+        const s32 mtxIndex = i * 3;
+        for (s32 j = 0; j < 3; j++)
+            mtxPalette[mtxIndex + j] = mtx[i].v[j];
+    }
+    mShader.setUniformArray(boneCount * 3, mtxPalette, mVertexUniformLocation[VERTEX_UNIFORM_MTX_PALETTE], u32(-1));
 }
 
 void ShaderSwitch::setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const

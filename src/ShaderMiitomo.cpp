@@ -275,6 +275,7 @@ void ShaderMiitomo::initialize()
     mVertexUniformLocation[VERTEX_UNIFORM_NORMAL] = mShader.getVertexUniformLocation("uNormalMatrix");
     mVertexUniformLocation[VERTEX_UNIFORM_ALPHA] = mShader.getVertexUniformLocation("uAlpha");
     mVertexUniformLocation[VERTEX_UNIFORM_BONE_COUNT] = mShader.getVertexUniformLocation("uBoneCount");
+    mVertexUniformLocation[VERTEX_UNIFORM_BONE_MATRICES] = mShader.getVertexUniformLocation("uBoneMatrices");
     mVertexUniformLocation[VERTEX_UNIFORM_HS_LIGHT_GROUND_COLOR] = mShader.getVertexUniformLocation("uHSLightGroundColor");
     mVertexUniformLocation[VERTEX_UNIFORM_HS_LIGHT_SKY_COLOR] = mShader.getVertexUniformLocation("uHSLightSkyColor");
     mVertexUniformLocation[VERTEX_UNIFORM_LIGHT_DIR_AND_TYPE0] = mShader.getVertexUniformLocation("uDirLightDirAndType0");
@@ -438,7 +439,6 @@ void ShaderMiitomo::bind(bool light_enable, FFLiCharInfo* pCharInfo)
 #endif
 
     mShader.setUniform(cAlpha, mVertexUniformLocation[VERTEX_UNIFORM_ALPHA], u32(-1));
-    mShader.setUniform(0, mVertexUniformLocation[VERTEX_UNIFORM_BONE_COUNT], u32(-1));
 
     mShader.setUniform(light_enable, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_ENABLE]);
 
@@ -454,6 +454,22 @@ void ShaderMiitomo::bind(bool light_enable, FFLiCharInfo* pCharInfo)
     mShader.setUniform(cDirLightCount, mVertexUniformLocation[VERTEX_UNIFORM_DIR_LIGHT_COUNT], u32(-1));
 
     mShader.setUniform(cLightColor, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_COLOR]);
+
+    mShader.setUniform(0, mVertexUniformLocation[VERTEX_UNIFORM_BONE_COUNT], u32(-1));
+}
+
+void ShaderMiitomo::setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount)
+{
+    mShader.setUniform(1, mVertexUniformLocation[VERTEX_UNIFORM_BONE_COUNT], u32(-1));
+
+    rio::BaseVec4f mtxPalette[3 * SHADER_MAX_BONE_COUNT];
+    for (s32 i = 0; i < boneCount; i++)
+    {
+        const s32 mtxIndex = i * 3;
+        for (s32 j = 0; j < 3; j++)
+            mtxPalette[mtxIndex + j] = mtx[i].v[j];
+    }
+    mShader.setUniformArray(boneCount * 3, mtxPalette, mVertexUniformLocation[VERTEX_UNIFORM_BONE_MATRICES], u32(-1));
 }
 
 void ShaderMiitomo::setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const

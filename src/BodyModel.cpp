@@ -3,23 +3,64 @@
 #include <Types.h>
 #include <Model.h>
 
-BodyModel::BodyModel(rio::mdl::Model* pBodyModel, BodyType type)
+#include <misc/rio_MemUtil.h>
+
+//BodyModel::BodyModel(rio::mdl::Model* pBodyModel, BodyType type)
+BodyModel::BodyModel(BodyModelItem* pItem)
     : mpModel(nullptr)
-    , mScale{ 1.0f, 1.0f, 1.0f }
+    , mpBodyModel(pItem)
+    //, mScale{ 1.0f, 1.0f, 1.0f }
     , mBodyScale{ 1.0f, 1.0f, 1.0f }
     , mpShader(nullptr)
     , mBodyColor{ 0.0f, 0.0f, 0.0f, 1.0f }
-    , mBodyType{ type }
+    , mBodyType{ pItem->mType }
     , mPantsColor(PANTS_COLOR_GRAY)
+    , mUseSkeleton(false)
+    , mSkeletonMatrix{ }
 {
-    // ig you already know the gender by now
-    mpBodyModel = pBodyModel;
-
-    const f32 s = cBodyTypeScaleFactors[type];
+    //mpBodyModel = pBodyModel;
+    //const f32 s = cBodyTypeScaleFactors[type];
+    const f32 s = mpBodyModel->mScale;
     mScale = { s, s, s };
 }
 
 BodyModel::~BodyModel() { }
+
+namespace
+{
+    // Note that these are the same bones
+    // between the Switch MiiBodyHigh model
+    // and the Wii U MiiBodyMiddle model.
+    enum VriableIconBodyBoneKind
+    {
+        VriableIconBodyBoneKind_AllRoot   = 0,
+        VriableIconBodyBoneKind_Body      = 1,
+        VriableIconBodyBoneKind_SklRoot   = 2,
+        VriableIconBodyBoneKind_Chest     = 3,
+        VriableIconBodyBoneKind_ArmL1     = 4,
+        VriableIconBodyBoneKind_ArmL2     = 5,
+        VriableIconBodyBoneKind_WristL    = 6,
+        VriableIconBodyBoneKind_ElbowL    = 7,
+        VriableIconBodyBoneKind_ShoulderL = 8,
+        VriableIconBodyBoneKind_ArmR1     = 9,
+        VriableIconBodyBoneKind_ArmR2     = 10,
+        VriableIconBodyBoneKind_WristR    = 11,
+        VriableIconBodyBoneKind_ElbowR    = 12,
+        VriableIconBodyBoneKind_ShoulderR = 13,
+        VriableIconBodyBoneKind_Head      = 14,
+        VriableIconBodyBoneKind_Chest2    = 15,
+        VriableIconBodyBoneKind_Hip       = 16,
+        VriableIconBodyBoneKind_FootL1    = 17,
+        VriableIconBodyBoneKind_FootL2    = 18,
+        VriableIconBodyBoneKind_AnkleL    = 19,
+        VriableIconBodyBoneKind_KneeL     = 20,
+        VriableIconBodyBoneKind_FootR1    = 21,
+        VriableIconBodyBoneKind_FootR2    = 22,
+        VriableIconBodyBoneKind_AnkleR    = 23,
+        VriableIconBodyBoneKind_KneeR     = 24,
+        VriableIconBodyBoneKind_End       = 25
+    };
+}
 
 void BodyModel::initialize(Model* pModel, PantsColor pantsColor)
 {
@@ -31,6 +72,12 @@ void BodyModel::initialize(Model* pModel, PantsColor pantsColor)
     mBodyColor = FFLGetFavoriteColor(pCharInfo->favoriteColor);
 
     mPantsColor = pantsColor;
+
+    if (mpBodyModel->useSkeleton())
+    {
+        mUseSkeleton = true;
+        initializeSkeleton_();
+    }
 }
 
 rio::Vector3f BodyModel::getHeadRotation()
@@ -46,6 +93,19 @@ rio::Vector3f BodyModel::getHeadRelativeTranslation()
 rio::Vector3f BodyModel::getHeadTranslation()
 {
     rio::Vector3f translate;
+
+    if (mUseSkeleton)
+    {
+        rio::Matrix34f mat = mSkeletonMatrix[mpBodyModel->mHeadBoneID];
+
+        // extract translation and scale translation only:
+        translate.x = mat.m[0][3];
+        translate.y = mat.m[1][3];
+        translate.z = mat.m[2][3];
+        translate.setMul(translate, mScale); // scale translation
+        return translate;
+    }
+
     translate.setMul(getHeadRelativeTranslation(), mBodyScale);
     translate.setMul(translate, mScale);
     return translate;
@@ -53,10 +113,218 @@ rio::Vector3f BodyModel::getHeadTranslation()
 
 rio::Matrix34f BodyModel::getHeadModelMatrix()
 {
-    rio::Matrix34f bodyHeadMatrix;
+    rio::Matrix34f mat; // head matrix
+    if (mUseSkeleton)
+    {
+        // extract head matrix
+        mat = mSkeletonMatrix[mpBodyModel->mHeadBoneID];
+        mat.setTranslationWorld(getHeadTranslation()); // set scaled translation
+        return mat;
+    }
     // apply head rotation, and translation
-    bodyHeadMatrix.makeRT(getHeadRotation(), getHeadTranslation());
-    return bodyHeadMatrix;
+    mat.makeRT(getHeadRotation(), getHeadTranslation());
+    return mat;
+}
+
+
+
+// TODO TODO NEEDS REORGANIZATIOn    ------------------------
+namespace
+{
+
+/*
+enum BodyBoneScaleType
+{
+    BODY_BONE_SCALE_TYPE_NONE,
+    BODY_BONE_SCALE_TYPE_XYZ,
+    BODY_BONE_SCALE_TYPE_YXZ,
+    BODY_BONE_SCALE_TYPE_XXX,
+    BODY_BONE_SCALE_TYPE_TRANSLATION,
+};
+*/
+
+// void nn::mii::detail::`anonymous namespace'::UpdateScale(class nn::util::Vector3f *, enum nn::mii::detail::VriableIconBodyBoneKind, struct nn::util::Float3 const &)
+static void UpdateScale(rio::Vector3f &scaleOut, VriableIconBodyBoneKind bone, const rio::Vector3f &bodyScale)
+{
+    // miibodylow "3ds":
+    //bone = static_cast<VriableIconBodyBoneKind>(bone + 1);
+    switch (bone)
+    {
+    case VriableIconBodyBoneKind_AllRoot:   [[fallthrough]];
+    case VriableIconBodyBoneKind_Body:      [[fallthrough]];
+    case VriableIconBodyBoneKind_SklRoot:
+        // Do not update scale.mSkeletonMatrix
+        break;
+    case VriableIconBodyBoneKind_Chest:     [[fallthrough]];
+    case VriableIconBodyBoneKind_Chest2:    [[fallthrough]];
+    case VriableIconBodyBoneKind_Hip:       [[fallthrough]];
+    case VriableIconBodyBoneKind_FootL1:    [[fallthrough]];
+    case VriableIconBodyBoneKind_FootL2:    [[fallthrough]];
+    case VriableIconBodyBoneKind_FootR1:    [[fallthrough]];
+    case VriableIconBodyBoneKind_FootR2:
+        // Chest, Hip, Foot: XYZ
+        // Includes entire body except
+        // for entire arms/hands and shoes.
+        scaleOut.x = bodyScale.x;
+        scaleOut.y = bodyScale.y;
+        scaleOut.z = bodyScale.z;
+        break;
+    case VriableIconBodyBoneKind_ArmL1:     [[fallthrough]];
+    case VriableIconBodyBoneKind_ArmL2:     [[fallthrough]];
+    case VriableIconBodyBoneKind_ElbowL:    [[fallthrough]];
+    case VriableIconBodyBoneKind_ArmR1:     [[fallthrough]];
+    case VriableIconBodyBoneKind_ArmR2:     [[fallthrough]];
+    case VriableIconBodyBoneKind_ElbowR:
+        // Arm, Elbow: YXZ
+        // Includes: Entire arms.
+        scaleOut.x = bodyScale.y;
+        scaleOut.y = bodyScale.x;
+        scaleOut.z = bodyScale.z;
+        break;
+    case VriableIconBodyBoneKind_WristL:    [[fallthrough]];
+    case VriableIconBodyBoneKind_ShoulderL: [[fallthrough]];
+    case VriableIconBodyBoneKind_WristR:    [[fallthrough]];
+    case VriableIconBodyBoneKind_ShoulderR: [[fallthrough]];
+    case VriableIconBodyBoneKind_AnkleL:    [[fallthrough]];
+    case VriableIconBodyBoneKind_KneeL:     [[fallthrough]];
+    case VriableIconBodyBoneKind_AnkleR:    [[fallthrough]];
+    case VriableIconBodyBoneKind_KneeR:
+        // Wrist, Shoulder, Ankle, Knee: XXX (one dimension)
+        // Includes:
+        // * Shoulders
+        // * Hand spheres
+        // * Knees
+        // * Shoes
+        scaleOut.x = bodyScale.x;
+        scaleOut.y = bodyScale.x;
+        scaleOut.z = bodyScale.x;
+        break;
+    case VriableIconBodyBoneKind_Head:
+    {
+        // Head: XYZ, with Y clamped to 1.0.
+        // Pretty much don't touch translation
+        /*
+        scaleOut.x = bodyScale.x;
+        float one = 1.0f;
+        // Clamp Y maximum to 1.0.
+        float limitedY = (bodyScale.y < one) ? bodyScale.y : one;
+        scaleOut.y = limitedY;
+        scaleOut.z = bodyScale.z;
+        */
+        // Do not modify.
+        break;
+    }
+    default:
+        RIO_ASSERT(false && "what kind of bone is this?????");
+    }
+    return;
+}
+
+static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* parentBoneIDs, const s32 matrixCount, const rio::Vector3f bodyScale)
+{
+    // Meant to model the two loops done in: void nn::mii::detail::VariableIconBodyImpl::CalculateWorldMatrix(VariableIconBodyImpl *this,VariableIconBodyWorldMatrix *pOut,Gender gender,int build,int height);
+    for (int bone = 0; bone < matrixCount; bone++)
+    {
+        const s32 parent = parentBoneIDs[bone];
+        // Skip this bone if there is no parent:
+        if (parent < 0)
+            continue; // No scaling, rotation, etc.
+        // mtx = localMatrices[bone]
+        rio::Matrix34f& mtx = localMatrices[bone]; // mirror
+
+        // localScale = scale difference in this bone.
+        rio::Vector3f localScale = { 1.0f, 1.0f, 1.0f }; // Initialize
+        // Get scale vector for PARENT BONE INDEX
+        UpdateScale(localScale, (VriableIconBodyBoneKind)parent, bodyScale);
+
+        // Update translation:
+
+        // Get translation/W-axis from matrix.
+        rio::Vector3f w = { mtx.m[0][3], mtx.m[1][3], mtx.m[2][3] };
+        // If boneKind == SklRoot => modifies the translation:
+
+        // If this bone is skl_root (2), update translation.
+        // Usually performed in: void nn::mii::detail::`anonymous namespace'::UpdateRotateTranslate(struct nn::util::general::MatrixRowMajor4x3fType *, enum nn::mii::detail::VriableIconBodyBoneKind, struct nn::util::Float3 const &)
+        if (bone == VriableIconBodyBoneKind_SklRoot)
+        {
+            // Multiply translation by YYX axes:
+            w.x *= bodyScale.y; // X by bodyScale.y
+            w.y *= bodyScale.y; // Y by bodyScale.y
+            w.z *= bodyScale.x; // Z by bodyScale.x
+
+            // Add to Y translation from bodyScale and
+            // scale factor of body model relative to world vvv
+            w.y += ((bodyScale.x - bodyScale.y) * 1.0f);
+                              // cBodyScaleFactor ^^^^ (orig. = 7.0f)
+        }
+
+        w.setMul(w, localScale); // Multiply: w.xyz * localScale.xyz
+        // ^^ Equiv: w.x *= localScale.x; w.y *= localScale.y; w.z *= localScale.z;
+
+        // Set translation on matrix: (maybe applyScaleWorld?)
+        mtx.m[0][3] = w.x; mtx.m[1][3] = w.y; mtx.m[2][3] = w.z;
+
+        // Multiply matrices:
+        mtx.setMul(localMatrices[parent], mtx); // Multiply parent and local bone
+    }
+
+    for (int bone = 0; bone < matrixCount; bone++)
+    {
+        // localScale = scale difference in this bone.
+        rio::Vector3f localScale = { 1.0f, 1.0f, 1.0f }; // Initialize
+        // Get scale vector for this bone, not parent
+        UpdateScale(localScale, (VriableIconBodyBoneKind)bone, bodyScale);
+
+        // Usually performed in: void nn::mii::detail::`anonymous namespace'::MatrixScaleBase(struct nn::util::general::MatrixRowMajor4x3fType *, struct nn::util::general::MatrixRowMajor4x3fType const &, struct nn::util::general::Vector3fType const &)
+
+        // Update scale and rotation, but not translation.
+        /* TODO: THIS DOES NOT WORK...???
+        // X axis
+        localMatrices[bone].m[0][0] *= localScale.x;
+        localMatrices[bone].m[0][1] *= localScale.x;
+        localMatrices[bone].m[0][2] *= localScale.x;
+        // Y axis
+        localMatrices[bone].m[1][0] *= localScale.y;
+        localMatrices[bone].m[1][1] *= localScale.y;
+        localMatrices[bone].m[1][2] *= localScale.y;
+        // Z axis
+        localMatrices[bone].m[2][0] *= localScale.z;
+        localMatrices[bone].m[2][1] *= localScale.z;
+        localMatrices[bone].m[2][2] *= localScale.z;
+        */
+        // Apply local scale on matrix.
+        localMatrices[bone].applyScaleLocal(localScale);
+    }
+}
+
+}
+
+void BodyModel::initializeSkeleton_()
+{
+    s32 parentBoneIDs[sizeof(mSkeletonMatrix) / sizeof(rio::Matrix34f)];
+    for (s32 i = 0; i < mpBodyModel->mBoneCount; i++)
+    {
+        mSkeletonMatrix[i] = mpBodyModel->mBones[i].localMatrix;
+        parentBoneIDs[i] = mpBodyModel->mBones[i].parentID;
+        //if (parentBoneIDs[i] < 0) continue;
+        //mSkeletonMatrix[i].setMul(mSkeletonMatrix[parentBoneIDs[i]], mSkeletonMatrix[i]);
+    }
+    CalculateWorldMatrix(mSkeletonMatrix, parentBoneIDs, mpBodyModel->mBoneCount, mBodyScale);
+}
+
+rio::mdl::Model* BodyModel::getBodyModel_()
+{
+    FFLiCharInfo* pCharInfo = mpModel->getCharInfo();
+    FFLGender genderTmp = pCharInfo->gender;
+
+    // Clamp the value of gender.
+    const FFLGender gender = static_cast<FFLGender>(genderTmp % FFL_GENDER_MAX);
+
+    // Select body model based on gender.
+    rio::mdl::Model* model = mpBodyModel->mpModels[gender];
+
+    RIO_ASSERT(model); // make sure it is not null
+    return model;
 }
 
 // draws mii body based on charinfo's build/height
@@ -69,20 +337,20 @@ void BodyModel::draw(rio::Matrix34f& model_mtx, rio::BaseMtx34f& view_mtx, rio::
     FFLiCharInfo* pCharInfo = mpModel->getCharInfo();
     //const FFLGender gender = pCharInfo->gender;
 
-    // Select body model.
-    //RIO_ASSERT(gender < FFL_GENDER_MAX);
-    //const rio::mdl::Model* model = mpBodyModels[bodyType][gender]; // Based on gender.
-
-    const rio::mdl::Mesh* meshes = mpBodyModel->meshes(); // Body and pants mesh.
+    const rio::mdl::Model* pModel = getBodyModel_();
+    const rio::mdl::Mesh* meshes = pModel->meshes(); // Body and pants mesh.
 
     // Render each mesh in order
-    for (u32 i = 0; i < mpBodyModel->numMeshes(); i++)
+    for (u32 i = 0; i < pModel->numMeshes(); i++)
     {
         const rio::mdl::Mesh& mesh = meshes[i];
 
         // Bind shader and set body material.
         IShader* pShader = mpModel->getShader();
         pShader->bind(lightEnable, pCharInfo);
+
+        if (mUseSkeleton)
+            pShader->setBoneMatrix(mSkeletonMatrix, mpBodyModel->mBoneCount);
 
         bool isPantsModel = ((i % 2) == 1); // is it the second mesh?
 
@@ -118,7 +386,10 @@ void BodyModel::draw(rio::Matrix34f& model_mtx, rio::BaseMtx34f& view_mtx, rio::
         rio::Matrix34f modelMtxBody = rio::Matrix34f::ident;//model_mtx;
 
         // apply scale factors before anything else
-        modelMtxBody.applyScaleLocal(mBodyScale);
+        if (mUseSkeleton)
+            modelMtxBody.applyScaleLocal(mScale);
+        else
+            modelMtxBody.applyScaleLocal(mBodyScale);
         // apply original model matrix (rotation)
         modelMtxBody.setMul(model_mtx, modelMtxBody);
 

@@ -144,7 +144,8 @@ private:
     f32                 mCounter;
     s32                 mMiiCounter;
     Model*              mpModel;
-    rio::mdl::Model*    mpBodyModels[BODY_TYPE_MAX][FFL_GENDER_MAX];
+
+    BodyModelItem       mpBodyModels[BODY_TYPE_MAX];
     bool                mHeadwearAvailable;
     HeadwearList        mHeadwearList;
 

@@ -52,7 +52,7 @@ RootTask::RootTask()
     , mCounter(0.0f)
     , mMiiCounter(0)
     , mpModel(nullptr)
-    , mpBodyModels{ nullptr }
+    //, mpBodyModels{ nullptr }
     , mHeadwearAvailable(false)
 {
 #ifdef RIO_USE_OSMESA // off screen rendering
@@ -390,7 +390,13 @@ void RootTask::prepare_()
     }
 
     // load body models
-    loadBodyModels_();
+    static const char* cBodyModelsCSVPath = "body_models.csv";
+    if (!BodyModelItem::populateArrayFromCSV(mpBodyModels, cBodyModelsCSVPath))
+    {
+        fprintf(stderr, "Failed to load body models from %s, cannot continue, failing.\n", cBodyModelsCSVPath);
+        rio::Exit();
+        exit(EXIT_FAILURE);
+    }
 
     // load headwear models
     mHeadwearAvailable =
@@ -410,40 +416,6 @@ void RootTask::prepare_()
     createModel_();
 
     mInitialized = true;
-}
-
-void RootTask::loadBodyModels_()
-{
-    RIO_LOG("loading body models: ");
-    for (u32 bodyType = 0; bodyType < BODY_TYPE_MAX; bodyType++)
-    {
-        for (u32 gender = 0; gender < FFL_GENDER_MAX; gender++)
-        {
-            const char* bodyTypeString = cBodyTypeStrings[bodyType];
-            const char* genderString = cBodyGenderStrings[gender];
-
-            char bodyPathC[64];
-            // make sure that will not overfloowwwww
-            //RIO_ASSERT((strlen(bodyTypeString) + strlen(genderString) + strlen(cBodyFileNameFormat)) < 64);
-
-            snprintf(bodyPathC, sizeof(bodyPathC), cBodyFileNameFormat, bodyTypeString, genderString);
-
-            RIO_LOG("%s, ", bodyPathC);
-            const rio::mdl::res::Model* resModel = rio::mdl::res::ModelCacher::instance()->loadModel(bodyPathC, bodyPathC);
-
-            RIO_ASSERT(resModel);
-            if (resModel == nullptr)
-            {
-                fprintf(stderr, "\nBody model not found: %s. Exiting.\n", bodyPathC);
-                rio::Exit();
-                exit(EXIT_FAILURE);
-            }
-
-            mpBodyModels[bodyType][gender] = new rio::mdl::Model(resModel);
-        }
-    }
-    // print bold/blue:
-    RIO_LOG("\033[1m(all loaded successfully)\033[0m\n");
 }
 
 // amount of mii indexes to cycle through
@@ -530,7 +502,7 @@ void RootTask::createModel_()
         //mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
     }*/
     static const BodyType cBodyType = BODY_TYPE_WIIU_MIIBODYMIDDLE;
-    mpModel->mpBody = new BodyModel(getBodyModel_(mpModel, cBodyType), cBodyType);
+    mpModel->mpBody = new BodyModel(&mpBodyModels[cBodyType]);
     mpModel->mpBody->initialize(mpModel, PANTS_COLOR_GRAY);
     if (mpModel->mpHeadwear != nullptr)
         mpModel->mpHeadwear->initialize(mpModel, mpModel->getCharInfo()->favoriteColor);
@@ -781,7 +753,7 @@ rio::mdl::Model* RootTask::getBodyModel_(Model* pModel, BodyType type)
     const FFLGender gender = static_cast<FFLGender>(genderTmp % FFL_GENDER_MAX);
 
     // Select body model.
-    rio::mdl::Model* model = mpBodyModels[type][gender]; // Based on gender.
+    rio::mdl::Model* model = mpBodyModels[type].mpModels[gender]; // Based on gender.
 
     RIO_ASSERT(model); // make sure it is not null
     return model;
@@ -815,8 +787,10 @@ void RootTask::setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, 
 
             // FFLMakeIconWithBody view uses 37.05f, 415.53f
             // below values are extracted from wii u mii maker
-            pCamera->pos() = { 0.0f, 33.016785f, 411.181793f };
-            pCamera->at() = { 0.0f, 34.3f, 0.0f };//33.016785f, 0.0f };
+            pCamera->pos() = { 0.0f, 34.0f, 411.181793f };
+                                  // 33.016785f
+            pCamera->at()  = { 0.0f, 34.3f, 0.0f };
+                                  // 33.016785f
             pCamera->setUp({ 0.0f, 1.0f, 0.0f });
             break;
         }
@@ -849,7 +823,7 @@ void RootTask::setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, 
             //pCamera->pos() = { 0.0f, 50.0f, 805.0f };
             //pCamera->at() = { 0.0f, 98.0f, 0.0f };
             // initial values:
-            pCamera->pos() = { 0.0f, 9.0f, 900.0f };
+            pCamera->pos() = { 0.0f, 98.0f, 900.0f };
             pCamera->at() = { 0.0f, 105.0f, 0.0f };
 
             pCamera->setUp({ 0.0f, 1.0f, 0.0f });
@@ -880,12 +854,12 @@ void RootTask::setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, 
             const f32 scaleFactorY = BodyModel::calcBodyScale(pCharInfo->build, pCharInfo->height).y;
 
             // These camera parameters look right when the character is tallest
-            const rio::Vector3f posStart = { 0.0f, 30.0f, 550.0f };
+            const rio::Vector3f posStart = { 0.0f, 65.0f, 550.0f };
             const rio::Vector3f atStart = { 0.0f, 65.0f, 0.0f };
 
             // Likewise these look correct when it's shortest.
-            const rio::Vector3f posEnd = { 0.0f, 9.0f, 850.0f };
-            const rio::Vector3f atEnd = { 0.0f, 90.0f, 0.0f };
+            const rio::Vector3f posEnd = { 0.0f, 75.0f, 850.0f };
+            const rio::Vector3f atEnd = { 0.0f, 88.0f, 0.0f };
 
             // Calculate interpolation factor (normalized to range [0, 1])
             f32 t = (scaleFactorY - 0.5f) / (1.264f - 0.5f);
@@ -906,17 +880,18 @@ void RootTask::setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, 
                 atStart.z + t * (atEnd.z - atStart.z)
             };
 
-            /*
+
+
             // height = 127, 1.264
-            pCamera->pos() = { 0.0f, 9.0f, 850.0f };
-            pCamera->at() = { 0.0f, 90.0f, 0.0f }; // higher = model is lower
+            //pCamera->pos() = { 0.0f, 75.0f, 850.0f };
+            //pCamera->at() = { 0.0f, 88.0f, 0.0f }; // higher = model is lower
             // height = 0,   0.5
-            pCamera->pos() = { 0.0f, 30.0f, 550.0f }; // lower = closer
-            pCamera->at() = { 0.0f, 65.0f, 0.0f };
-            */
+            //pCamera->pos() = { 0.0f, 65.0f, 550.0f }; // lower = closer
+            //pCamera->at() = { 0.0f, 65.0f, 0.0f };
 
             pCamera->pos() = pos;
             pCamera->at() = at;
+
             //pCamera->pos() = { 0.0f, 9.0f, 900.0f };
             //pCamera->at() = { 0.0f, 6.0f, 0.0f };
             pCamera->setUp({ 0.0f, 1.0f, 0.0f });
@@ -1168,7 +1143,7 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
         || bodyType >= BODY_TYPE_MAX)
         bodyType = cShaderTypeDefaultBodyType[req->shaderType % SHADER_TYPE_MAX];
 
-    pModel->mpBody = new BodyModel(getBodyModel_(pModel, bodyType), bodyType);
+    pModel->mpBody = new BodyModel(&mpBodyModels[bodyType]);
     PantsColor pantsColor = static_cast<PantsColor>(req->pantsColor);
     if (pantsColor <= PANTS_COLOR_DEFAULT_FOR_SHADER
         || pantsColor >= PANTS_COLOR_MAX)
@@ -1179,14 +1154,6 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
     {
         // Initializes scale factors:
         pModel->mpBody->initialize(pModel, pantsColor);
-
-        rio::Vector3f translate = pModel->mpBody->getHeadTranslation();
-        // Translate camera position up:
-        position.setAdd(position, translate);
-
-        if (!isCameraPosAbsolute)
-            // Translate at, if camera is NOT absolute
-            camera.at().setAdd(camera.at(), translate);
     }
 
     camera.pos() = position;
@@ -1200,18 +1167,41 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
     // apply rotation
     model_mtx.setMul(rio::Matrix34f::ident, rotationMtx);
 
+    rio::Matrix34f view_mtx;
+    camera.getMatrix(&view_mtx);
+
     if (willDrawBody)
     {
         rio::Matrix34f bodyHeadMatrix = pModel->mpBody->getHeadModelMatrix();
         // translate head to its location on the body
         model_mtx.setMul(model_mtx, bodyHeadMatrix);
+
+        // applies translation AND ROTATION to the camera
+        // note to self: this is matching more
+        // with this: https://web.archive.org/web/20170521213000im_/https://cdn-mii.accounts.nintendo.com/1.0.0/miis/8ed7ef7660b3b2cf/image/1dd84ae2a599e70f-ebcc0c4f725b6b02.png?type=face&expression=normal&width=512&instanceCount=1&instanceRotationMode=model
+        // but seemingly no rotation is done here?: https://debian.local:8445/assets/jasmine-sample-270-wiiu-no-aa.png
+
+        if (!isCameraPosAbsolute)
+        {
+            rio::Matrix34f inverseModelMtx;
+            inverseModelMtx.setInverse(bodyHeadMatrix);
+            view_mtx.setMul(view_mtx, inverseModelMtx);
+        }
+/*
+        if (!isCameraPosAbsolute)
+        {
+            rio::Vector3f translate = pModel->mpBody->getHeadTranslation();
+            // Translate at, if camera is NOT absolute
+            camera.at().setAdd(camera.at(), translate);
+        }
+*/
     }
 
     pModel->setMtxRT(model_mtx);
 
-    rio::Matrix34f view_mtx;
-    camera.getMatrix(&view_mtx);
 
+    // and NOTE that is like, not to be applied when
+    // when camera pos is absolute thiiinkkk
 
     const SplitMode splitMode = static_cast<SplitMode>(req->splitMode);
     if (splitMode != SPLIT_MODE_NONE)
@@ -1672,10 +1662,12 @@ void RootTask::exit_()
     for (u32 type = 0; type < SHADER_TYPE_MAX; type++)
         delete mpShaders[type];
     // delete body models that were initialized earlier
+    /*
     for (u32 i = 0; i < BODY_TYPE_MAX; i++)
         for (u32 g = 0; g < FFL_GENDER_MAX; g++)
             if (mpBodyModels[i][g] != nullptr)
                 delete mpBodyModels[i][g];
+    */
 
     mInitialized = false;
 }

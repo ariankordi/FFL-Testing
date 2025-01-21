@@ -450,6 +450,10 @@ void Shader::bind(bool light_enable, FFLiCharInfo* pCharInfo)
 
     mShader.setUniform(getColorUniform(cRimColor), u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_COLOR]);
     mShader.setUniform(cRimPower, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_RIM_POWER]);
+
+    // reset specular mode, parameter mode
+    mShader.setUniform(FFL_SPECULAR_MODE_NORMAL, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_MATERIAL_SPECULAR_MODE]);
+    mShader.setUniform(1, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_PARAMETER_MODE]); // FFL_PARAMETER_MODE_DEFAULT_1
 }
 
 #ifdef FFL_USE_ADJUST_MTX
@@ -554,9 +558,11 @@ void Shader::setModulate_(const FFLModulateParam& modulateParam)
     case FFL_MODULATE_MODE_ALPHA:
     case FFL_MODULATE_MODE_LUMINANCE_ALPHA:
     case FFL_MODULATE_MODE_ALPHA_OPA:
+        RIO_ASSERT(modulateParam.pColorR != nullptr);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST1], *modulateParam.pColorR);
         break;
     case FFL_MODULATE_MODE_RGB_LAYERED:
+        RIO_ASSERT(modulateParam.pColorR != nullptr);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST1], *modulateParam.pColorR);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST2], *modulateParam.pColorG);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST3], *modulateParam.pColorB);

@@ -616,10 +616,12 @@ void ShaderMiitomo::setModulate_(const FFLModulateParam& modulateParam)
     case FFL_MODULATE_MODE_ALPHA:
     case FFL_MODULATE_MODE_LUMINANCE_ALPHA:
     case FFL_MODULATE_MODE_ALPHA_OPA:
+        RIO_ASSERT(modulateParam.pColorR != nullptr);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST1], multiplyColorIfNeeded(modulateParam, *modulateParam.pColorR));
         break;
     case FFL_MODULATE_MODE_RGB_LAYERED:
     {
+        RIO_ASSERT(modulateParam.pColorR != nullptr);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST1],
                        multiplyColorIfNeeded(modulateParam, *modulateParam.pColorR));
         // sclera (white part of eye), upper lip

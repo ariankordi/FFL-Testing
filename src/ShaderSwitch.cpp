@@ -705,9 +705,11 @@ void ShaderSwitch::setModulate_(const FFLModulateParam& modulateParam)
     case FFL_MODULATE_MODE_ALPHA:
     case FFL_MODULATE_MODE_LUMINANCE_ALPHA:
     case FFL_MODULATE_MODE_ALPHA_OPA:
+        RIO_ASSERT(modulateParam.pColorR != nullptr);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST_COLOR1], *modulateParam.pColorR);
         break;
     case FFL_MODULATE_MODE_RGB_LAYERED:
+        RIO_ASSERT(modulateParam.pColorR != nullptr);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST_COLOR1], *modulateParam.pColorR);
         setConstColor_(mPixelUniformLocation[PIXEL_UNIFORM_CONST_COLOR2], *modulateParam.pColorG);
         mShader.setUniform(modulateParam.pColorB->r, modulateParam.pColorB->g, modulateParam.pColorB->b, 0.0f, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_CONST_COLOR3]);
@@ -755,7 +757,8 @@ static s32 getHairCommonColorFromVer3_(s32 index)
     else
     {
         s32 commonColor = index & FFLI_NN_MII_COMMON_COLOR_MASK;
-        RIO_ASSERT(commonColor >= 0 && commonColor <= 100);
+        // msvc complains that the value above may
+        // exceed the size of the table it's indexing
         return commonColor;
     }
 }

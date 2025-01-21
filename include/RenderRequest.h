@@ -37,6 +37,9 @@ PACKED(struct RenderRequest
     int8_t   pantsColor;     // PantsColor, -1 = default shader
     int8_t   bodyType;       // BodyType, -1 = default for shader
 
+    int8_t   headwearIndex;  // -1 = disabled.
+    int8_t   headwearColor;  // -1
+
     uint8_t  instanceCount;  // for instanceCountNewRender loop
     uint8_t  instanceRotationMode; // model, camera, TODO
     int16_t  lightDirection[3];    // unset if all negative, TODO

@@ -111,7 +111,7 @@ FFL_SRC := $(shell find ffl/src -name '*.cpp')
 # include both shaders
 SHADER ?= src/Shader.cpp src/ShaderSwitch.cpp src/ShaderMiitomo.cpp
 # Main source
-SRC := src/main.cpp src/Model.cpp src/RootTask.cpp $(SHADER) src/DataUtils.cpp src/BodyModel.cpp src/RenderTexture.cpp
+SRC := src/main.cpp src/Model.cpp src/RootTask.cpp $(SHADER) src/DataUtils.cpp src/BodyModel.cpp src/RenderTexture.cpp src/HeadwearModel.cpp
 ifeq (,$(findstring NO_GLTF, $(DEFS)))
 SRC += src/tinygltf_impl.cpp src/GLTFExportCallback.cpp
 endif

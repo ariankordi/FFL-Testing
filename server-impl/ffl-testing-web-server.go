@@ -64,6 +64,10 @@ type RenderRequest struct {
 	ClothesColor         int8 // default: -1
 	PantsColor           int8 // ^^
 	BodyType             int8 // ^^
+
+	HeadwearIndex        int8
+	HeadwearColor        int8
+
 	InstanceCount        uint8
 	InstanceRotationMode uint8
 	LightDirection       [3]int16 // default/unset: -1
@@ -636,6 +640,16 @@ func renderImage(ow http.ResponseWriter, r *http.Request) {
 		pantsColorStr = "default"
 	}
 
+
+	headwearIndexStr := query.Get("headwearIndex")
+	if headwearIndexStr == "" {
+		headwearIndexStr = "-1"
+	}
+	headwearColorStr := query.Get("headwearColor")
+	if headwearColorStr == "" {
+		headwearColorStr = ""
+	}
+
 	var responseFormat uint8 = 0
 	if strings.HasSuffix(r.URL.Path, ".glb") {
 		responseFormat = 1 // output is gltf
@@ -855,6 +869,12 @@ func renderImage(ow http.ResponseWriter, r *http.Request) {
 		pantsColor = getMapToInt(pantsColorStr, pantsColorMap, -1)
 	}
 
+	var headwearColor int
+	headwearColor, err = strconv.Atoi(headwearColorStr)
+	if err != nil {
+		headwearColor = getMapToInt(headwearColorStr, clothesColorMap, -1)
+	}
+
 	// Parsing and validating width
 	width, err := strconv.Atoi(widthStr)
 	if err != nil {
@@ -882,6 +902,12 @@ func renderImage(ow http.ResponseWriter, r *http.Request) {
 	ssaaFactor, err := strconv.Atoi(ssaaFactorStr)
 	if err != nil || ssaaFactor > 2 {
 		http.Error(w, "scale must be a number less than 2", http.StatusBadRequest)
+		return
+	}
+
+	headwearIndex, err := strconv.Atoi(headwearIndexStr)
+	if err != nil {
+		http.Error(w, "headwearIndex is not a number", http.StatusBadRequest)
 		return
 	}
 
@@ -1013,6 +1039,8 @@ func renderImage(ow http.ResponseWriter, r *http.Request) {
 		ClothesColor:    int8(clothesColor),
 		PantsColor:      int8(pantsColor),
 		BodyType:        int8(bodyType),
+		HeadwearIndex:   int8(headwearIndex),
+		HeadwearColor:   int8(headwearColor),
 		InstanceCount:   uint8(instanceCount),
 		InstanceRotationMode: 0, // TODO
 		LightDirection:  lightDirectionVec3i,

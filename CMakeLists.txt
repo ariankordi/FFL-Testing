@@ -194,6 +194,7 @@ set(SRC_FILES
     src/DataUtils.cpp
     src/BodyModel.cpp
     src/RenderTexture.cpp
+    src/HeadwearModel.cpp
 
     src/Shader.cpp
     src/ShaderSwitch.cpp

@@ -6,6 +6,7 @@
 
 #include <IShader.h>
 #include <BodyModel.h>
+#include <HeadwearModel.h>
 
 class Model
 {
@@ -21,6 +22,7 @@ public:
     Model();
     ~Model();
     BodyModel*     mpBody;
+    HeadwearModel* mpHeadwear;
 
     bool initialize(const InitArg& arg, IShader& shader);
 

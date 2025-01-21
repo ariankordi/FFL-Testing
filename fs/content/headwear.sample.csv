@@ -1,0 +1,11 @@
+ID,Name,Type,Texture,NormalTexture
+0,none,,
+1,cap,hat,hat_1.tga
+2,beanie,hat,hat_2.tga
+3,top_hat,hat,hat_3.tga
+4,ribbon,normal,
+5,bow,normal,
+6,cat_ears,normal,hat_6.tga
+7,straw_hat,hat,hat_7.tga
+8,hijab,skinhead,
+9,bike_helmet,hat,hat_9.tga

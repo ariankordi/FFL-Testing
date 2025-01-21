@@ -34,6 +34,8 @@
 #include <Types.h> // enums for RootTask
 
 #include <BodyModel.h>
+#include <HeadwearList.h>
+
 #define FFLICHARINFO_SIZE sizeof(FFLiCharInfo)
 
 #if RIO_IS_WIN
@@ -143,6 +145,8 @@ private:
     s32                 mMiiCounter;
     Model*              mpModel;
     rio::mdl::Model*    mpBodyModels[BODY_TYPE_MAX][FFL_GENDER_MAX];
+    bool                mHeadwearAvailable;
+    HeadwearList        mHeadwearList;
 
     // For server:
     int                 mServerFD;

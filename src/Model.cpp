@@ -11,6 +11,7 @@
 
 Model::Model()
     : mpBody(nullptr)
+    , mpHeadwear(nullptr)
     , mCharModelDesc()
     , mMtxRT(rio::Matrix34f::ident)
     , mScale { 1.0f, 1.0f, 1.0f }
@@ -34,6 +35,8 @@ Model::~Model()
 
     if (mpBody != nullptr)
         delete mpBody;
+    if (mpHeadwear != nullptr)
+        delete mpHeadwear;
 }
 
 void Model::initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource* p_source)

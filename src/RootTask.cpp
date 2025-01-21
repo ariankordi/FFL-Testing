@@ -22,6 +22,7 @@
 #include <nn/ffl/detail/FFLiCrc.h>
 #include <TGAHeader.h>
 #include <RenderTexture.h>
+#include <HeadwearModel.h>
 
 #include <string>
 
@@ -52,6 +53,7 @@ RootTask::RootTask()
     , mMiiCounter(0)
     , mpModel(nullptr)
     , mpBodyModels{ nullptr }
+    , mHeadwearAvailable(false)
 {
 #ifdef RIO_USE_OSMESA // off screen rendering
     sServerOnlyFlag = "1"; // force it truey
@@ -390,6 +392,10 @@ void RootTask::prepare_()
     // load body models
     loadBodyModels_();
 
+    // load headwear models
+    mHeadwearAvailable =
+        mHeadwearList.loadFromCSV("headwear.csv");
+
 #if RIO_IS_WIN
     fillStoreDataArray_();
     setupSocket_();
@@ -510,6 +516,9 @@ void RootTask::createModel_()
 
     mpModel = new Model();
     ShaderType shaderType = SHADER_TYPE_WIIU;//(mMiiCounter-1) % (SHADER_TYPE_MAX);
+
+    //mpModel->mpHeadwear = new HeadwearModel(mHeadwearList.getByID(2));
+    //mpModel->mpHeadwear->modifyCharInfoAndFlag(&charInfo, &arg.desc.modelFlag);
     if (!mpModel->initialize(arg, *mpShaders[shaderType]))
     {
         delete mpModel;
@@ -523,6 +532,9 @@ void RootTask::createModel_()
     static const BodyType cBodyType = BODY_TYPE_WIIU_MIIBODYMIDDLE;
     mpModel->mpBody = new BodyModel(getBodyModel_(mpModel, cBodyType), cBodyType);
     mpModel->mpBody->initialize(mpModel, PANTS_COLOR_GRAY);
+    if (mpModel->mpHeadwear != nullptr)
+        mpModel->mpHeadwear->initialize(mpModel, mpModel->getCharInfo()->favoriteColor);
+
     mCounter = 0.0f;
 }
 
@@ -658,6 +670,35 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
     };
 
     mpModel = new Model();
+
+    const s32 headwearIndex = req->headwearIndex;
+    if (headwearIndex >= 0)
+    {
+        HeadwearItem* pHeadwearItem = mHeadwearList.getByID(headwearIndex);
+        if (pHeadwearItem == nullptr && headwearIndex != 0)
+        // HACK: do not error if id is 0
+        {
+            if (!mHeadwearAvailable)
+                // show different error if headwear is unavailable
+                errMsg = "headwear.csv could not be loaded on this server so headwear is unavailable";
+            else
+            {
+                errMsg = "unknown headwear index: "
+                + std::to_string(headwearIndex)
+                + "\n";
+            }
+            errMsg = socketErrorPrefix + errMsg;
+            send(socket_handle, errMsg.c_str(), static_cast<int>(errMsg.length()), 0);
+            return false;
+        }
+        if (pHeadwearItem != nullptr)
+        {
+            // initialize headwear
+            mpModel->mpHeadwear = new HeadwearModel(pHeadwearItem);
+            mpModel->mpHeadwear->modifyCharInfoAndFlag(&charInfo, &arg.desc.modelFlag);
+        }
+    }
+
     ShaderType whichShader = SHADER_TYPE_WIIU;
     if (req->shaderType < SHADER_TYPE_MAX)
         whichShader = static_cast<ShaderType>(req->shaderType);
@@ -691,6 +732,16 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         delete mpModel;
         mpModel = nullptr;
         return false;
+    }
+
+    if (mpModel->mpHeadwear != nullptr)
+    {
+        // get headwear favorite color
+        FFLFavoriteColor headwearColor = static_cast<FFLFavoriteColor>(req->headwearColor);
+        if (headwearColor < 0 || headwearColor >= FFL_FAVORITE_COLOR_MAX)
+            headwearColor = mpModel->getCharInfo()->favoriteColor;
+        // initialize headwear with charmodel
+        mpModel->mpHeadwear->initialize(mpModel, headwearColor);
     }
 
     mCounter = 0.0f;
@@ -1305,6 +1356,12 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
         pModel->drawOpa(view_mtx, projMtx);
     RIO_LOG("drawOpa rendered to the buffer.\n");
 
+    // draw headwear if it is not null
+    if (pModel->mpHeadwear != nullptr)
+    {
+        pModel->mpHeadwear->draw(model_mtx, view_mtx, projMtx);
+    }
+
     // draw body?
     if (willDrawBody)
     {
@@ -1513,6 +1570,8 @@ void RootTask::calc_()
     mpModel->setMtxRT(model_mtx);
 
     mpModel->drawOpa(view_mtx, mProjMtxIconBody);
+    if (mpModel->mpHeadwear != nullptr)
+        mpModel->mpHeadwear->draw(model_mtx, view_mtx, mProjMtxIconBody);
     if (mpModel->mpBody != nullptr)
         mpModel->mpBody->draw(rotationMtx, view_mtx, mProjMtxIconBody);
     mpModel->drawXlu(view_mtx, mProjMtxIconBody);

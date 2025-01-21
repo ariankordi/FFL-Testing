@@ -213,17 +213,6 @@ private:
                 bone.localMatrix.a[j] = std::stof(field);
             }
 
-            // Store into rio::Matrix34f format.
-
-            // Assuming that the matrix order is the same, which it's supposed to be.
-            //rio::MemUtil::copy(&mSkeletonMatrix[count],
-            //                   &matData, sizeof(rio::Matrix34f));
-            //mSkeletonMatrix[count] = {
-            //    matData[0],  matData[1],  matData[2],  matData[3],
-            //    matData[4],  matData[5],  matData[6],  matData[7],
-            //    matData[8],  matData[9],  matData[10], matData[11],
-                // Discard rows 12, 13, 14, 15 (W axis)
-            //};
         }
 
         rio::MemUtil::free(data);

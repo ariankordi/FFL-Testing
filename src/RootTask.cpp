@@ -52,7 +52,6 @@ RootTask::RootTask()
     , mCounter(0.0f)
     , mMiiCounter(0)
     , mpModel(nullptr)
-    //, mpBodyModels{ nullptr }
     , mHeadwearAvailable(false)
 {
 #ifdef RIO_USE_OSMESA // off screen rendering
@@ -1661,13 +1660,6 @@ void RootTask::exit_()
     // delete all shaders that were initialized
     for (u32 type = 0; type < SHADER_TYPE_MAX; type++)
         delete mpShaders[type];
-    // delete body models that were initialized earlier
-    /*
-    for (u32 i = 0; i < BODY_TYPE_MAX; i++)
-        for (u32 g = 0; g < FFL_GENDER_MAX; g++)
-            if (mpBodyModels[i][g] != nullptr)
-                delete mpBodyModels[i][g];
-    */
 
     mInitialized = false;
 }

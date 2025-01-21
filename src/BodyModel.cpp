@@ -18,8 +18,6 @@ BodyModel::BodyModel(BodyModelItem* pItem)
     , mUseSkeleton(false)
     , mSkeletonMatrix{ }
 {
-    //mpBodyModel = pBodyModel;
-    //const f32 s = cBodyTypeScaleFactors[type];
     const f32 s = mpBodyModel->mScale;
     mScale = { s, s, s };
 }
@@ -60,6 +58,15 @@ namespace
         VriableIconBodyBoneKind_KneeR     = 24,
         VriableIconBodyBoneKind_End       = 25
     };
+
+    rio::Vector3f GetMatrixTranslation(rio::Matrix34f& mtx)
+    {
+        return { mtx.m[0][3], mtx.m[1][3], mtx.m[2][3] };
+    }
+    void SetMatrixTranslation(rio::Matrix34f& mtx, rio::Vector3f t)
+    {
+        mtx.m[0][3] = t.x; mtx.m[1][3] = t.y; mtx.m[2][3] = t.z;
+    }
 }
 
 void BodyModel::initialize(Model* pModel, PantsColor pantsColor)
@@ -99,9 +106,7 @@ rio::Vector3f BodyModel::getHeadTranslation()
         rio::Matrix34f mat = mSkeletonMatrix[mpBodyModel->mHeadBoneID];
 
         // extract translation and scale translation only:
-        translate.x = mat.m[0][3];
-        translate.y = mat.m[1][3];
-        translate.z = mat.m[2][3];
+        translate = GetMatrixTranslation(mat);
         translate.setMul(translate, mScale); // scale translation
         return translate;
     }
@@ -128,7 +133,6 @@ rio::Matrix34f BodyModel::getHeadModelMatrix()
 
 
 
-// TODO TODO NEEDS REORGANIZATIOn    ------------------------
 namespace
 {
 
@@ -203,15 +207,8 @@ static void UpdateScale(rio::Vector3f &scaleOut, VriableIconBodyBoneKind bone, c
     {
         // Head: XYZ, with Y clamped to 1.0.
         // Pretty much don't touch translation
-        /*
-        scaleOut.x = bodyScale.x;
-        float one = 1.0f;
-        // Clamp Y maximum to 1.0.
-        float limitedY = (bodyScale.y < one) ? bodyScale.y : one;
-        scaleOut.y = limitedY;
-        scaleOut.z = bodyScale.z;
-        */
-        // Do not modify.
+        // Actually we will not scale, just
+        // scale translation only later
         break;
     }
     default:
@@ -240,7 +237,7 @@ static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* paren
         // Update translation:
 
         // Get translation/W-axis from matrix.
-        rio::Vector3f w = { mtx.m[0][3], mtx.m[1][3], mtx.m[2][3] };
+        rio::Vector3f w = GetMatrixTranslation(mtx);
         // If boneKind == SklRoot => modifies the translation:
 
         // If this bone is skl_root (2), update translation.
@@ -262,7 +259,7 @@ static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* paren
         // ^^ Equiv: w.x *= localScale.x; w.y *= localScale.y; w.z *= localScale.z;
 
         // Set translation on matrix: (maybe applyScaleWorld?)
-        mtx.m[0][3] = w.x; mtx.m[1][3] = w.y; mtx.m[2][3] = w.z;
+        SetMatrixTranslation(mtx, w);
 
         // Multiply matrices:
         mtx.setMul(localMatrices[parent], mtx); // Multiply parent and local bone
@@ -277,22 +274,7 @@ static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* paren
 
         // Usually performed in: void nn::mii::detail::`anonymous namespace'::MatrixScaleBase(struct nn::util::general::MatrixRowMajor4x3fType *, struct nn::util::general::MatrixRowMajor4x3fType const &, struct nn::util::general::Vector3fType const &)
 
-        // Update scale and rotation, but not translation.
-        /* TODO: THIS DOES NOT WORK...???
-        // X axis
-        localMatrices[bone].m[0][0] *= localScale.x;
-        localMatrices[bone].m[0][1] *= localScale.x;
-        localMatrices[bone].m[0][2] *= localScale.x;
-        // Y axis
-        localMatrices[bone].m[1][0] *= localScale.y;
-        localMatrices[bone].m[1][1] *= localScale.y;
-        localMatrices[bone].m[1][2] *= localScale.y;
-        // Z axis
-        localMatrices[bone].m[2][0] *= localScale.z;
-        localMatrices[bone].m[2][1] *= localScale.z;
-        localMatrices[bone].m[2][2] *= localScale.z;
-        */
-        // Apply local scale on matrix.
+        // Apply local scale on matrix. (Scale/Rotate/NOT translate)
         localMatrices[bone].applyScaleLocal(localScale);
     }
 }

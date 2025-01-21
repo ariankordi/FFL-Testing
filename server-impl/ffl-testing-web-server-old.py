@@ -103,7 +103,7 @@ class RenderRequest:
 
     def pack(self):
         return struct.pack(
-            '96sHBBHhBbBBIIIhhhhhhBBBBBB???bBbBBhhhB',
+            '96sHBBHhBbBBIIIhhhhhhBBBBBB???bBbbbBBhhhB',
             self.data,                 # data: 96s
             self.data_length,          # dataLength: H (uint16_t)
             1 << 0,                    # modelType: B (uint8_t)
@@ -133,6 +133,8 @@ class RenderRequest:
             self.clothes_color,        # clothesColor: b (int8_t)
             self.pants_color,          # pantsColor: B (uint8_t)
             -1,                        # bodyType: b (int8_t)
+            -1,                        # headwearIndex: b (int8_t)
+            -1,                        # headwearColor: b (int8_t)
             0,                         # instanceCount: B (uint8_t)
             0,                         # instanceRotationMode: B (uint8_t)
             -1,                        # lightDirection.x: h (int16_t)

@@ -1,6 +1,7 @@
 #include <BodyModel.h>
 #include <BodyTypes.h>
 #include <Types.h>
+#include <Model.h>
 
 BodyModel::BodyModel(rio::mdl::Model* pBodyModel, BodyType type)
     : mpModel(nullptr)

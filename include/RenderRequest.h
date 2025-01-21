@@ -1,13 +1,6 @@
 #pragma once
 
-// snippet below from: https://github.com/microsoft/CMake/blob/a5caf2fee0a42735b8f5f54e146da39099f1a8a6/Utilities/cmlibarchive/libarchive/archive_write_set_format_cpio_binary.c#L75
-
-// snippet to define that a struct should not have alignment
-#ifdef __GNUC__
-    #define PACKED(x) x __attribute__((packed))
-#elif defined(_MSC_VER)
-    #define PACKED(x) __pragma(pack(push, 1)) x __pragma(pack(pop))
-#endif
+#include <Types.h> // for PACKED()
 
 // Structure representing a render request, derived from
 // request query parameters by caller (web server).

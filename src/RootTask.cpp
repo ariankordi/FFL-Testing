@@ -20,8 +20,8 @@
 #include <gfx/mdl/res/rio_ModelCacher.h>
 
 #include <nn/ffl/detail/FFLiCrc.h>
+#include <TGAHeader.h>
 #include <RenderTexture.h>
-#include <BodyModel.h>
 
 #include <string>
 
@@ -179,8 +179,8 @@ void RootTask::setupSocket_()
     {
         perror("bind failed");
         RIO_LOG("\033[1m" \
-        "TIP: Change the default port of 12346 with the --port argument." \
-        "\033[0m\n");
+        "TIP: Change the port of %d with the --port argument." \
+        "\033[0m\n", port);
         rio::Exit();
         exit(EXIT_FAILURE);
     }
@@ -520,6 +520,9 @@ void RootTask::createModel_()
         mpModel->setScale({ 1.f, 1.f, 1.f });
         //mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
     }*/
+    static const BodyType cBodyType = BODY_TYPE_WIIU_MIIBODYMIDDLE;
+    mpModel->mpBody = new BodyModel(getBodyModel_(mpModel, cBodyType), cBodyType);
+    mpModel->mpBody->initialize(mpModel, PANTS_COLOR_GRAY);
     mCounter = 0.0f;
 }
 
@@ -694,27 +697,25 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
     return true;
 }
 
-#define TGA_HEADER_SIZE 18
-
 static void writeTGAHeaderToSocket(int socket, u32 width, u32 height, rio::TextureFormat textureFormat)
 {
     const u8 bitsPerPixel = rio::TextureFormatUtil::getPixelByteSize(textureFormat) * 8;
 
     // create tga header for this texture
-    u8 header[TGA_HEADER_SIZE]; // tga header size = 0x12
+    TGAHeader header; // tga header size = 0x12
     // set all fields to 0 initially including unused ones
-    rio::MemUtil::set(&header, 0, TGA_HEADER_SIZE);
-    header[ 2] = 2;                    // imageType, 2 = uncomp_true_color
-    header[12] = width & 0xff;         // width MSB
-    header[13] = (width >> 8) & 0xff;  // width LSB
-    header[14] = height & 0xff;        // height MSB
-    header[15] = (height >> 8) & 0xff; // height LSB
-    header[16] = bitsPerPixel;
-    header[17] = 8;  // 32 = Flag that sets the image origin to the top left
-                     // nnas standard tgas set this to 8 to be upside down
+    rio::MemUtil::set(&header, 0, sizeof(TGAHeader));
+    header.imageType = 2; // uncomp_true_color
+    header.width = width;
+    header.height = height;
+    // NOTE: client infers rgba or rgb from bpp (ig type is not set for if it is BGR)
+    header.bitsPerPixel = bitsPerPixel;
+    header.imageDescriptor = 8;  // 32 = Flag that sets the image origin to the top left
+    // nnas standard tgas set this to 8 to be upside down
     // tga header will be written to socket at the same time pixels are reads
 
-    send(socket, reinterpret_cast<char*>(&header), TGA_HEADER_SIZE, 0); // send tga header
+    // write tga header out to the socket
+    send(socket, &header, sizeof(TGAHeader), 0);
 }
 
 
@@ -1116,18 +1117,19 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
         || bodyType >= BODY_TYPE_MAX)
         bodyType = cShaderTypeDefaultBodyType[req->shaderType % SHADER_TYPE_MAX];
 
-    BodyModel bodyModel(getBodyModel_(pModel, bodyType), bodyType);
+    pModel->mpBody = new BodyModel(getBodyModel_(pModel, bodyType), bodyType);
     PantsColor pantsColor = static_cast<PantsColor>(req->pantsColor);
     if (pantsColor <= PANTS_COLOR_DEFAULT_FOR_SHADER
         || pantsColor >= PANTS_COLOR_MAX)
         pantsColor = cShaderTypeDefaultPantsType[req->shaderType % SHADER_TYPE_MAX];
 
+
     if (willDrawBody)
     {
         // Initializes scale factors:
-        bodyModel.initialize(pModel, pantsColor);
+        pModel->mpBody->initialize(pModel, pantsColor);
 
-        rio::Vector3f translate = bodyModel.getHeadTranslation();
+        rio::Vector3f translate = pModel->mpBody->getHeadTranslation();
         // Translate camera position up:
         position.setAdd(position, translate);
 
@@ -1149,7 +1151,7 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
 
     if (willDrawBody)
     {
-        rio::Matrix34f bodyHeadMatrix = bodyModel.getHeadModelMatrix();
+        rio::Matrix34f bodyHeadMatrix = pModel->mpBody->getHeadModelMatrix();
         // translate head to its location on the body
         model_mtx.setMul(model_mtx, bodyHeadMatrix);
     }
@@ -1314,7 +1316,7 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
             // change favorite color after drawing opa
             pCharInfo->favoriteColor = static_cast<FFLFavoriteColor>(req->clothesColor);
 
-        bodyModel.draw(rotationMtx, view_mtx, projMtx);
+        pModel->mpBody->draw(rotationMtx, view_mtx, projMtx);
         // restore original favorite color tho
         pCharInfo->favoriteColor = originalFavoriteColor;
     }
@@ -1502,18 +1504,17 @@ void RootTask::calc_()
     rio::BaseMtx34f view_mtx;
     mCamera.getMatrix(&view_mtx);
 
-    static const BodyType cBodyType = BODY_TYPE_WIIU_MIIBODYMIDDLE;
-    BodyModel bodyModel(getBodyModel_(mpModel, cBodyType), cBodyType);
-    bodyModel.initialize(mpModel, PANTS_COLOR_GRAY);
-
     rio::Matrix34f rotationMtx = model_mtx;
 
     //model_mtx.setMul(rio::Matrix34f::ident, rotationMtx);
-    model_mtx.setMul(model_mtx, bodyModel.getHeadModelMatrix());
+    if (mpModel->mpBody != nullptr)
+        model_mtx.setMul(model_mtx,  mpModel->mpBody->getHeadModelMatrix());
+
     mpModel->setMtxRT(model_mtx);
 
     mpModel->drawOpa(view_mtx, mProjMtxIconBody);
-    bodyModel.draw(rotationMtx, view_mtx, mProjMtxIconBody);
+    if (mpModel->mpBody != nullptr)
+        mpModel->mpBody->draw(rotationMtx, view_mtx, mProjMtxIconBody);
     mpModel->drawXlu(view_mtx, mProjMtxIconBody);
 }
 

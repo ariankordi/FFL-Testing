@@ -33,6 +33,7 @@
 #include <RenderRequest.h>
 #include <Types.h> // enums for RootTask
 
+#include <BodyModel.h>
 #define FFLICHARINFO_SIZE sizeof(FFLiCharInfo)
 
 #if RIO_IS_WIN

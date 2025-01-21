@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
-	"database/sql"
+	"time"
+	"bufio"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"image"
 	"image/png"
@@ -15,10 +14,9 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
-	"time"
+
 	// ApproxBiLinear for CPU SSAA
 	"golang.org/x/image/draw"
 
@@ -26,6 +24,10 @@ import (
 	"image/color"
 	"syscall"
 
+	"flag"
+	"os"
+
+	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -66,9 +68,6 @@ type RenderRequest struct {
 	InstanceRotationMode uint8
 	LightDirection       [3]int16 // default/unset: -1
 	SplitMode            uint8
-
-	// NOTE: needs to be adjusted on EVERY update:
-	//_                    [3]byte // padding for alignment
 }
 
 const FFL_EXPRESSION_LIMIT = 70
@@ -83,8 +82,8 @@ func SetExpressionFlagIndex(ef *FFLAllExpressionFlag, index int, set bool) {
 		return // Do not set anything.
 	}
 
-	part := index / 32     // Determine which 32-bit block
-	bitIndex := index % 32 // Determine which bit within the block
+	part := index / 32       // Determine which 32-bit block
+	bitIndex := index % 32   // Determine which bit within the block
 
 	if set {
 		ef.Flags[part] |= (1 << bitIndex) // Set the bit
@@ -151,12 +150,6 @@ var drawStageModes = map[string]int{
 	"xlu_only":       2,
 	"mask_only":      3,
 	"xlu_depth_mask": 4,
-}
-
-func isConnectionRefused(err error) bool {
-	return errors.Is(err, syscall.ECONNREFUSED) ||
-		// WSAECONNREFUSED on windows
-		errors.Is(err, syscall.Errno(10061))
 }
 
 var corsOrigin string
@@ -450,23 +443,6 @@ func logTimeSincePrintfln(inTime *time.Time, printString string) {
 	log.Printf(printString+"\n", ms)
 }
 
-// fetchDataFromDB fetches the data from the database for a given NNID
-func fetchDataFromDB(nnid string) ([]byte, error) {
-	normalizedNnid := normalizeNnid(nnid)
-	query := "SELECT data FROM nnid_to_mii_data_map WHERE normalized_nnid = ? LIMIT 1"
-	var data []byte
-	err := db.QueryRow(query, normalizedNnid).Scan(&data)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-// normalizeNnid normalizes the NNID by converting to lowercase and removing special characters
-func normalizeNnid(nnid string) string {
-	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(nnid, "-", ""), "_", ""), ".", ""))
-}
-
 // decodeBase64 decodes a Base64 string, handling both standard and URL-safe Base64.
 func decodeBase64(s string) ([]byte, error) {
 	// Normalize URL-safe Base64 by replacing '-' with '+' and '_' with '/'
@@ -488,6 +464,35 @@ func decodeBase64(s string) ([]byte, error) {
 func isHex(s string) bool {
 	_, err := hex.DecodeString(s)
 	return err == nil
+}
+
+func isConnectionRefused(err error) bool {
+	return errors.Is(err, syscall.ECONNREFUSED) ||
+		// WSAECONNREFUSED on windows
+		errors.Is(err, syscall.Errno(10061))
+}
+
+//func handleConnectionRefused(err error) {
+//	if !isConnectionRefused(err) {
+//		return
+//	}
+//}
+
+// fetchDataFromDB fetches the data from the database for a given NNID
+func fetchDataFromDB(nnid string) ([]byte, error) {
+	normalizedNnid := normalizeNnid(nnid)
+	query := "SELECT data FROM nnid_to_mii_data_map WHERE normalized_nnid = ? LIMIT 1"
+	var data []byte
+	err := db.QueryRow(query, normalizedNnid).Scan(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// normalizeNnid normalizes the NNID by converting to lowercase and removing special characters
+func normalizeNnid(nnid string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(nnid, "-", ""), "_", ""), ".", ""))
 }
 
 // if a socket response starts with this it
@@ -531,18 +536,6 @@ func sendRenderRequest(request RenderRequest) ([]byte, io.Reader, error) {
 
 // handleRenderRequestError sends a response for an error from the renderer backend.
 func handleRenderRequestError(w http.ResponseWriter, bufferData []byte, err error) {
-	/*
-		isIncompleteData := err.Error() == "EOF"
-		var opError *net.OpError
-		var syscallError *os.SyscallError
-		if errors.As(err, &opError) && errors.As(err, &syscallError) {
-			if syscallError.Err == syscall.ECONNRESET ||
-				// WSAECONNREFUSED on windows
-				syscallError.Err == syscall.Errno(10061) {
-					isIncompleteData = true
-				}
-		}
-	*/
 	// Handling incomplete data response
 	if err.Error() == "EOF" ||
 		err.Error() == "unexpected EOF" || // from io.ReadFull
@@ -577,8 +570,13 @@ func handleRenderRequestError(w http.ResponseWriter, bufferData []byte, err erro
 // ssaaFactor controls the resolution and scale multiplier.
 //const ssaaFactor = 2
 
-// renderImage handles the /render.png endpoint
-func renderImage(w http.ResponseWriter, r *http.Request) {
+var encoder = png.Encoder{CompressionLevel: png.BestSpeed}
+
+// renderImage handles the /miis/image.png endpoint
+
+func renderImage(ow http.ResponseWriter, r *http.Request) {
+
+	w := ow // shortcut to original writer
 	header := w.Header()
 	if corsOrigin != "" {
 		// Add permissive CORS headers.
@@ -615,11 +613,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		overrideTexResolution = true
 	}
 	nnid := query.Get("nnid")
-	// inform them that pnid is not here yet
-	if query.Get("pnid") != "" || query.Get("api_id") == "1" {
-		http.Error(w, "no support for pretendo yet sorry, try this: https://mii-unsecure.ariankordi.net/mii_data/PN_Jon?api_id=1", http.StatusNotImplemented)
-		return
-	}
+
 	resourceTypeStr := query.Get("resourceType")
 	if resourceTypeStr == "" {
 		resourceTypeStr = "default"
@@ -657,6 +651,14 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "specify a width", http.StatusBadRequest)
 		return
 	}*/
+
+	// inform them that pnid is not here yet
+	if query.Get("pnid") != "" || query.Get("api_id") == "1" {
+		http.Error(w, "no support for pretendo yet sorry, try this: https://mii-unsecure.ariankordi.net/mii_data/PN_Jon?api_id=1", http.StatusNotImplemented)
+		return
+	}
+
+	// show usage
 	if data == "" && nnid == "" {
 		http.Error(w, "specify \"data\" as FFLStoreData/mii studio data in hex/base64, or \"nnid\" as an nnid (add &api_id=1 if it is a pnid), finally specify \"width\" as the resolution", http.StatusBadRequest)
 		return
@@ -856,7 +858,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	// Parsing and validating width
 	width, err := strconv.Atoi(widthStr)
 	if err != nil {
-		http.Error(w, "width = resolution, int, no limit on this lmao,", http.StatusBadRequest)
+		http.Error(w, "width = resolution, int", http.StatusBadRequest)
 		return
 	}
 	if width > 4096 {
@@ -1151,7 +1153,7 @@ func renderImage(w http.ResponseWriter, r *http.Request) {
 	// Sending the image as a PNG response
 	header.Set("Content-Type", "image/png")
 
-	png.Encode(w, img)
+	encoder.Encode(w, img) // png.Encoder
 	logTimeSincePrintfln(startEncoding, "Time to encode PNG: %d ms")
 }
 

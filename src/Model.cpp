@@ -10,7 +10,8 @@
 #endif
 
 Model::Model()
-    : mCharModelDesc()
+    : mpBody(nullptr)
+    , mCharModelDesc()
     , mMtxRT(rio::Matrix34f::ident)
     , mScale { 1.0f, 1.0f, 1.0f }
     , mMtxSRT(rio::Matrix34f::ident)
@@ -30,6 +31,9 @@ Model::~Model()
         mIsInitialized = false;
     }
     delete mpCharModel;
+
+    if (mpBody != nullptr)
+        delete mpBody;
 }
 
 void Model::initialize_(const FFLCharModelDesc* p_desc, const FFLCharModelSource* p_source)
@@ -174,11 +178,9 @@ void Model::drawXluNormal_()
     render_state.setBlendConstantColor({ 0.0f, 0.0f, 0.0f, 0.0f });
 
     // "interpolated alpha blending" from nn::mii
-    /*
-    render_state.setBlendEquationAlpha(rio::Graphics::BLEND_FUNC_MAX);
-    render_state.setBlendFactorSrcAlpha(rio::Graphics::BLEND_MODE_ONE);
-    render_state.setBlendFactorDstAlpha(rio::Graphics::BLEND_MODE_ONE);
-    */
+    // render_state.setBlendEquationAlpha(rio::Graphics::BLEND_FUNC_MAX);
+    // render_state.setBlendFactorSrcAlpha(rio::Graphics::BLEND_MODE_ONE);
+    // render_state.setBlendFactorDstAlpha(rio::Graphics::BLEND_MODE_ONE);
     // settings for AFL and also FFL in cemu (closer)
     render_state.setBlendEquationAlpha(rio::Graphics::BLEND_FUNC_ADD);
     render_state.setBlendFactorSrcAlpha(rio::Graphics::BLEND_MODE_SRC_ALPHA);

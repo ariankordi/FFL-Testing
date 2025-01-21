@@ -5,6 +5,7 @@
 #include <nn/ffl.h>
 
 #include <IShader.h>
+#include <BodyModel.h>
 
 class Model
 {
@@ -19,6 +20,7 @@ public:
 public:
     Model();
     ~Model();
+    BodyModel*     mpBody;
 
     bool initialize(const InitArg& arg, IShader& shader);
 
@@ -35,6 +37,7 @@ public:
         return &pCharModel->charInfo;
     }
     IShader* getShader() const { return mpShader; }
+
     FFLResult getInitializeCpuResult() const { return mInitializeCpuResult; }
 
     void enableSpecialDraw();

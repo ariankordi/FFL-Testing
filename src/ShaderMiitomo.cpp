@@ -460,6 +460,9 @@ void ShaderMiitomo::bind(bool light_enable, FFLiCharInfo* pCharInfo)
 
 void ShaderMiitomo::setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount)
 {
+    if (mIsUsingMaskShader)
+        return mpMaskShader->setBoneMatrix(mtx, boneCount);
+
     mShader.setUniform(1, mVertexUniformLocation[VERTEX_UNIFORM_BONE_COUNT], u32(-1));
 
     rio::BaseVec4f mtxPalette[3 * SHADER_MAX_BONE_COUNT];

@@ -1412,11 +1412,6 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
     RIO_LOG("copyAndSendRenderBufferToSocket: %lld µs\n", duration);
 #endif
 
-    if (instanceCurrent < instanceTotal - 1)
-    {
-        instanceCurrent++;
-        goto instanceCountNewRender; // jump back earlier
-    }
 #if RIO_IS_WIN
     // Restore OpenGL state if we modified it
     if (flipY)
@@ -1428,6 +1423,11 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
         projMtx.m[1][1] *= -1.f;
     }
 #endif
+    if (instanceCurrent < instanceTotal - 1)
+    {
+        instanceCurrent++;
+        goto instanceCountNewRender; // jump back earlier
+    }
 
     closesocket(socket);
     RIO_LOG("Closed socket %d.\n", socket);

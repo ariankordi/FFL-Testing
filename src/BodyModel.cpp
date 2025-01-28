@@ -87,47 +87,40 @@ void BodyModel::initialize(Model* pModel, PantsColor pantsColor)
     }
 }
 
-rio::Vector3f BodyModel::getHeadRotation()
-{
-    return cBodyTypeHeadRotation[mBodyType];
-}
-
-rio::Vector3f BodyModel::getHeadRelativeTranslation()
-{
-    return { 0.0f, cBodyTypeHeadTranslation[mBodyType], 0.0f };
-}
-
 rio::Vector3f BodyModel::getHeadTranslation()
 {
     rio::Vector3f translate;
 
     if (mUseSkeleton)
     {
-        rio::Matrix34f mat = mSkeletonMatrix[mpBodyModel->mHeadBoneID];
+        // Skeleton path: use head bone matrix.
+        const s32 bone = mpBodyModel->mHeadBoneID;
+        rio::Matrix34f mat = mSkeletonMatrix[bone];
 
-        // extract translation and scale translation only:
+        // Extract translation and only scale that.
         translate = GetMatrixTranslation(mat);
         translate.setMul(translate, mScale); // scale translation
-        return translate;
+    }
+    else
+    {
+        // Non-skeleton path: use relative translation from
+        // mpBodyModel/BodyModelItem specified in CSV.
+        translate = { 0.0f, mpBodyModel->mHeadYTranslate, 0.0f };
+        // Scale by the same scale factors the model used.
+        translate.setMul(translate, mBodyScale);
+        translate.setMul(translate, mScale);
     }
 
-    translate.setMul(getHeadRelativeTranslation(), mBodyScale);
-    translate.setMul(translate, mScale);
     return translate;
 }
 
 rio::Matrix34f BodyModel::getHeadModelMatrix()
 {
-    rio::Matrix34f mat; // head matrix
-    if (mUseSkeleton)
-    {
-        // extract head matrix
-        mat = mSkeletonMatrix[mpBodyModel->mHeadBoneID];
-        mat.setTranslationWorld(getHeadTranslation()); // set scaled translation
-        return mat;
-    }
-    // apply head rotation, and translation
-    mat.makeRT(getHeadRotation(), getHeadTranslation());
+    rio::Matrix34f mat;
+
+    // apply head translation
+    mat.makeT(getHeadTranslation());
+
     return mat;
 }
 
@@ -206,9 +199,17 @@ static void UpdateScale(rio::Vector3f &scaleOut, VriableIconBodyBoneKind bone, c
     case VriableIconBodyBoneKind_Head:
     {
         // Head: XYZ, with Y clamped to 1.0.
-        // Pretty much don't touch translation
-        // Actually we will not scale, just
-        // scale translation only later
+        // NOTE that this is not actually used
+        // as the model matrix for the head.
+        scaleOut.x = bodyScale.x;
+        float one = 1.0f;
+        // Clamp Y maximum to 1.0.
+        float limitedY = (bodyScale.y < one) ? bodyScale.y : one;
+        scaleOut.y = limitedY;
+        scaleOut.z = bodyScale.z;
+        // The actual model matrix for the head
+        // should be the original unscaled matrix
+        // but with only translation vector scaled
         break;
     }
     default:
@@ -385,11 +386,12 @@ void BodyModel::draw(rio::Matrix34f& model_mtx, rio::BaseMtx34f& view_mtx, rio::
 }
 
 
-// scale vec3 for body
+// calculate vector in which body scaling is based off of
 rio::Vector3f BodyModel::calcBodyScale(f32 build, f32 height)
 {
     rio::Vector3f bodyScale;
-    // referenced in GetBodyScale (anonymous function) in nn::mii::detail::VariableIconBodyImpl::CalculateWorldMatrix
+    // calculated in this function: void __cdecl nn::mii::detail::`anonymous namespace'::GetBodyScale(struct nn::util::Float3 *, int, int)
+    // in libnn_mii/draw/src/detail/mii_VariableIconBodyImpl.cpp
     // also in ffl_app.rpx: FUN_020ec380 (FFLUtility), FUN_020737b8 (mii maker US)
 #ifndef USE_HEIGHT_LIMIT_SCALE_FACTORS
     // ScaleApply?

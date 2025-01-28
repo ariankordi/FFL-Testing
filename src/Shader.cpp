@@ -476,7 +476,7 @@ void Shader::setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount)
 }
 
 #ifdef FFL_USE_ADJUST_MTX
-rio::Matrix34f g_MV;
+rio::Matrix34f g_MV = rio::Matrix34f::ident;
 #endif
 
 void Shader::setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const

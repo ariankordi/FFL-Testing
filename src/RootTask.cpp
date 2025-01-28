@@ -197,15 +197,18 @@ void RootTask::setupSocket_()
 
     else
     {
+#ifdef __APPLE__
+        char serverOnlyReminder[] = "\033[1mWARNING: On macOS, when the window is open the server will either fail to respond to requests or emit glitchy images. So, make sure to use the --server argument to hide the window.\n\033[0m";
+#else
         char serverOnlyReminder[] = "\033[1mRemember to use the --server argument to hide the window.\n\033[0m";
-
+#endif
         // accept() blocks by default, this is needed
         // in server only mode but the mode will be
         // set to non-blocking without
         if (!sServerOnlyFlag)
         {
 #ifdef _WIN32
-            const u_long mode = 1;
+            u_long mode = 1; // cannot be const
             ioctlsocket(mServerFD, FIONBIO, &mode);
 #else
             fcntl(mServerFD, F_SETFL, O_NONBLOCK);
@@ -262,7 +265,7 @@ void RootTask::loadResourceFiles_()
         }
 
         // as well as the absolute resPath, try relative
-        pathsToTry.push_back(fsPath.filename());
+        pathsToTry.push_back(fsPath.filename().string());
         pathsToTry.push_back(resPath);
 
         bool resLoaded = false;
@@ -737,7 +740,7 @@ static void writeTGAHeaderToSocket(int socket, u32 width, u32 height, rio::Textu
     // tga header will be written to socket at the same time pixels are reads
 
     // write tga header out to the socket
-    send(socket, &header, sizeof(TGAHeader), 0);
+    send(socket, reinterpret_cast<char*>(&header), sizeof(TGAHeader), 0);
 }
 
 

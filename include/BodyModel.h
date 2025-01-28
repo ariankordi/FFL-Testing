@@ -88,6 +88,7 @@ public:
                 RIO_ASSERT(item.mType == type);
             }
 
+            item.mName = "type"; // HACK: without this there's corruption on MSVC??? below vvv
             std::getline(ss, field, ',');
                 item.mName = field;
 
@@ -236,8 +237,7 @@ public:
     {
         return mBodyScale;
     }
-    rio::Vector3f getHeadRotation();
-    rio::Vector3f getHeadRelativeTranslation();
+
     rio::Vector3f getHeadTranslation();
     rio::Matrix34f getHeadModelMatrix();
 
@@ -259,5 +259,6 @@ private:
     PantsColor             mPantsColor;
 
     bool                   mUseSkeleton;
+    rio::Matrix34f         mHeadModelMatrix;
     rio::Matrix34f         mSkeletonMatrix[65];
 };

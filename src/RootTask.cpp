@@ -1185,7 +1185,7 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
 
         if (!isCameraPosAbsolute)
         {
-            rio::Matrix34f inverseModelMtx;
+            rio::Matrix34f inverseModelMtx = rio::Matrix34f::ident;
             inverseModelMtx.setInverse(bodyHeadMatrix);
             view_mtx.setMul(view_mtx, inverseModelMtx);
         }
@@ -1313,10 +1313,15 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
     //}
     renderTexture.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR_DEPTH_STENCIL, fBackgroundColor);
 
-    // Bind the render buffer
+    // Bind the render buffer.
     renderTexture.bind();
 
     RIO_LOG("Render buffer bound.\n");
+    // Enable depth writing and testing.
+    rio::RenderState renderState;
+    renderState.setDepthEnable(true, true);
+    renderState.applyDepthAndStencilTest();
+
 
     // Set light direction.
     // Reset uniforms first
@@ -1341,22 +1346,33 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
 
     DrawStageMode drawStages = static_cast<DrawStageMode>(req->drawStageMode);
 
-    // Render the first frame to the buffer
-    if (drawStages == DRAW_STAGE_MODE_ALL
+    if (drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
+        renderTexture.bindDepthOnly();
+
+    // Body is drawn first.
+    if (willDrawBody &&
+        (drawStages == DRAW_STAGE_MODE_ALL
         || drawStages == DRAW_STAGE_MODE_OPA_ONLY
-        || drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK)
-        pModel->drawOpa(view_mtx, projMtx);
-    RIO_LOG("drawOpa rendered to the buffer.\n");
-
-    // draw headwear if it is not null
-    if (pModel->mpHeadwear != nullptr)
+        || drawStages == DRAW_STAGE_MODE_BODY_ONLY
+        || drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
+    )
     {
-        pModel->mpHeadwear->draw(model_mtx, view_mtx, projMtx);
-    }
+        /*
+        if (drawStages == DRAW_STAGE_MODE_BODY_DEPTH_MASK
+            || drawStages == DRAW_STAGE_MODE_BODY_ONLY)
+        {
+            // note xlu texture is not punched out
+            // Clear color but not depth
+            renderTexture.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR, fBackgroundColor); // Opaque
 
-    // draw body?
-    if (willDrawBody)
-    {
+            // Color was cleared, now determine to clear depth
+            if (drawStages == DRAW_STAGE_MODE_BODY_ONLY)
+                renderTexture.clear(rio::RenderBuffer::CLEAR_FLAG_DEPTH_STENCIL, fBackgroundColor);
+            // Bind renderbuffer again
+            renderTexture.bind();
+        }
+        */
+
         const FFLFavoriteColor originalFavoriteColor = pCharInfo->favoriteColor;
         if (req->clothesColor >= 0
             // verify favorite color is in range here bc it is NOT verified in drawMiiBodyREAL
@@ -1369,32 +1385,48 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
         // restore original favorite color tho
         pCharInfo->favoriteColor = originalFavoriteColor;
     }
+    if (drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
+        renderTexture.bindDepthColor();
 
+    // If this is XLU_DEPTH_MASK, only write depth for DrawOpa.
+    if (drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK)
+        renderTexture.bindDepthOnly();
+
+    // Render the first frame to the buffer
+    if (drawStages == DRAW_STAGE_MODE_ALL
+        || drawStages == DRAW_STAGE_MODE_OPA_ONLY
+        || drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK
+        || drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
+        pModel->drawOpa(view_mtx, projMtx);
+    RIO_LOG("drawOpa rendered to the buffer.\n");
+
+    // draw headwear if it is not null
+    if (pModel->mpHeadwear != nullptr)
+    {
+        pModel->mpHeadwear->draw(model_mtx, view_mtx, projMtx);
+    }
+
+    if (drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK)
+    {
+        // clear color before binding:
+        // Use faceline color as background color.
+        const FFLColor facelineColor = FFLGetFacelineColor(pCharInfo->parts.facelineColor);
+        // Clear color but not depth. This punches out
+        // depth for DrawOpa, intended for overlaying
+        // this image over a DrawOpa image.
+        renderTexture.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR, { facelineColor.r, facelineColor.g, facelineColor.b, fBackgroundColor.a });
+        // ^^ use alpha from original background color
+
+        renderTexture.bindDepthColor();
+    }
 
     // draw xlu mask only after body is drawn
     // in case there are elements of the mask that go in the body region
     if (drawStages == DRAW_STAGE_MODE_ALL
         || drawStages == DRAW_STAGE_MODE_XLU_ONLY
-        || drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK)
+        || drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK
+        || drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
     {
-        if (drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK
-            || drawStages == DRAW_STAGE_MODE_XLU_ONLY)
-        {
-            // Use faceline color as background color.
-            const FFLColor facelineColor = FFLGetFacelineColor(pCharInfo->parts.facelineColor);
-            // Clear color but not depth. This punches out
-            // depth for DrawOpa, intended for overlaying
-            // this image over a DrawOpa image.
-            renderTexture.clear(rio::RenderBuffer::CLEAR_FLAG_COLOR, { facelineColor.r, facelineColor.g, facelineColor.b, fBackgroundColor.a });
-            // ^^ use alpha from original background color
-
-            // Color was cleared, now determine to clear depth
-            if (drawStages == DRAW_STAGE_MODE_XLU_ONLY)
-                renderTexture.clear(rio::RenderBuffer::CLEAR_FLAG_DEPTH_STENCIL, fBackgroundColor);
-            // Bind renderbuffer again
-            renderTexture.bind();
-        }
-
         pModel->drawXlu(view_mtx, projMtx);
     }
     RIO_LOG("drawXlu rendered to the buffer.\n");

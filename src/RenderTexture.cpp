@@ -43,6 +43,28 @@ void RenderTexture::linkTargets_()
     mRenderBuffer.setRenderTargetDepth(&mDepthTarget);
 }
 
+void RenderTexture::bindDepthColor()
+{
+    mRenderBuffer.setRenderTargetColor(&mColorTarget);
+    mRenderBuffer.setRenderTargetDepth(&mDepthTarget);
+    mRenderBuffer.bind();
+}
+
+void RenderTexture::bindDepthOnly()
+{
+    mRenderBuffer.setRenderTargetColor(nullptr);
+    mRenderBuffer.setRenderTargetDepth(&mDepthTarget);
+    mRenderBuffer.bind();
+}
+
+/*
+void RenderTexture::setWriteColorOnly()
+{
+    mRenderBuffer.setRenderTargetColo]r(&mColorTarget);
+    mRenderBuffer.setRenderTargetDepth(nullptr);
+}
+*/
+
 #include <gpu/rio_VertexBuffer.h>
 #include <gpu/rio_Drawer.h>
 #include <gpu/win/rio_Texture2DUtilWin.h>

@@ -56,6 +56,9 @@ layout( location = 0 ) in highp   vec3 aPosition;   //!< 入力:[ 1 : 1 ] 位置
 layout( location = 1 ) in mediump vec2 aTexcoord0;  //!< 入力:[ 1 : 5 ] テクスチャー座標
 #endif
 layout( location = 2 ) in mediump vec3 aNormal;     //!< 入力:[ 1 : 2 ] 法線ベクトル
+
+// NOTE: none of the below attribute locations are correct
+
 layout( location = 3 ) in mediump vec4 aBoneIndex;  //!< 入力:[ 1 : 3 ] ボーンのインデックス（最大4つ）
 layout( location = 4 ) in mediump vec4 aBoneWeight; //!< 入力:[ 1 : 4 ] ボーンの影響度（最大4つ）
 #if defined(AGX_FEATURE_VERTEX_COLOR)

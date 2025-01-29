@@ -32,6 +32,8 @@ public:
         mRenderBuffer.clear(0, clear_flag, color, depth, stencil);
     }
 
+    void bindDepthColor();
+    void bindDepthOnly();
     void sendToSocket();
 private:
     void linkTargets_();

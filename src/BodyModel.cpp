@@ -323,6 +323,11 @@ void BodyModel::draw(rio::Matrix34f& model_mtx, rio::BaseMtx34f& view_mtx, rio::
     const rio::mdl::Model* pModel = getBodyModel_();
     const rio::mdl::Mesh* meshes = pModel->meshes(); // Body and pants mesh.
 
+    // Set blending options.
+    rio::RenderState render_state;
+    render_state.setBlendEnable(false); // Opaque blending.
+    render_state.applyBlendAndFastZ();
+
     // Render each mesh in order
     for (u32 i = 0; i < pModel->numMeshes(); i++)
     {

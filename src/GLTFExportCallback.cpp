@@ -682,7 +682,13 @@ void GLTFExportCallback::CalculateAccessorMinMax(const std::vector<T>& data, tin
  */
 void GLTFExportCallback::AddPrimitiveExtras(MeshData& meshData, tinygltf::Primitive& primitive)
 {
-    tinygltf::Value modulateModeValue(meshData.modulateMode);
+    FFLModulateMode modulateMode = meshData.modulateMode;
+    // Set modulate mode. NOTE that since all textures
+    // have been converted from R8/R8G8 to RGBA8,
+    // the modulate mode should be clamped to texture direct
+    modulateMode = std::min(modulateMode, FFL_MODULATE_MODE_TEXTURE_DIRECT);
+
+    tinygltf::Value modulateModeValue(modulateMode);
     tinygltf::Value modulateTypeValue(meshData.modulateType);
     // set "modulateColor" as colorR
     tinygltf::Value modulateColor(std::vector<tinygltf::Value>{

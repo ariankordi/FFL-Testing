@@ -479,6 +479,9 @@ void ShaderMiitomo::setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::
 {
     if (mIsUsingMaskShader)
         return mpMaskShader->setViewUniform(model_mtx, view_mtx, proj_mtx);
+
+    // Set uEyePt as -vec3(view) similar to
+    // FFLShader: vec3 eye = normalize(-v_position.xyz);
     mShader.setUniform(-view_mtx.m[0][3], -view_mtx.m[1][3], -view_mtx.m[2][3], mVertexUniformLocation[VERTEX_UNIFORM_EYE_PT], u32(-1));
     //mShader.setUniform(0.0f, 3.45f, 60.0f, mVertexUniformLocation[VERTEX_UNIFORM_EYE_PT], u32(-1));
     rio::Matrix34f mv;

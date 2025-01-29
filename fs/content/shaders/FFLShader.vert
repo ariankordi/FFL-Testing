@@ -14,12 +14,12 @@ precision highp float;
 #endif
 
 // 頂点シェーダーに入力される attribute 変数
-in vec4 a_position;   //!< 入力: 位置情報
-in vec2 a_texCoord;   //!< 入力: テクスチャー座標
+layout( location = 0 ) in vec4 a_position;   //!< 入力: 位置情報
+layout( location = 1 ) in vec2 a_texCoord;   //!< 入力: テクスチャー座標
 // NOTE: ^^ texCoord is used as matrix index
-in vec3 a_normal;     //!< 入力: 法線ベクトル
-in vec4 a_color;      //!< 入力: 頂点の色
-in vec3 a_tangent;    //!< 入力: 異方位
+layout( location = 2 ) in vec3 a_normal;     //!< 入力: 法線ベクトル
+layout( location = 3 ) in vec4 a_color;      //!< 入力: 頂点の色
+layout( location = 4 ) in vec3 a_tangent;    //!< 入力: 異方位
 
 // フラグメントシェーダーへの入力
 out   vec4 v_color;      //!< 出力: 頂点の色

@@ -149,11 +149,13 @@ var splitModes = map[string]int{
 }
 
 var drawStageModes = map[string]int{
-	"all":            0,
-	"opa_only":       1,
-	"xlu_only":       2,
-	"mask_only":      3,
-	"xlu_depth_mask": 4,
+	"all":                 0,
+	"opa_only":            1,
+	"xlu_only":            2,
+	"mask_only":           3,
+	"xlu_depth_mask":      4,
+	"body_only":           5,
+	"body_inv_depth_mask": 6,
 }
 
 var corsOrigin string

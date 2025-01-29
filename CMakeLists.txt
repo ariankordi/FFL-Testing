@@ -238,5 +238,9 @@ if(NOT USE_SENTRY_DSN STREQUAL "" AND sentry_FOUND)
     target_link_libraries(${TARGET_NAME} PRIVATE sentry::sentry)
 endif()
 
+if(WIN32) # Explicitly link winsock on Windows.
+    target_link_libraries(${TARGET_NAME} PRIVATE wsock32 ws2_32)
+endif()
+
 # ----------- Summary -----------
 message(STATUS "FFL-Testing: Build type: ${CMAKE_BUILD_TYPE}")

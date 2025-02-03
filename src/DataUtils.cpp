@@ -72,8 +72,8 @@ void charInfoNXToFFLiCharInfo(FFLiCharInfo* dest, const charInfo* src)
     dest->height = src->height;
     dest->build = src->build;
     rio::MemUtil::copy(dest->name, src->nickname, sizeof(src->nickname));
-    dest->gender = static_cast<FFLGender>(u32(src->gender));
-    dest->favoriteColor = static_cast<FFLFavoriteColor>(src->favorite_color);
+    dest->gender = FFLGender(u32(src->gender));
+    dest->favoriteColor = FFLFavoriteColor(src->favorite_color);
     // no equivalent for favoriteMii
     dest->regionMove = src->region_move;
     // MiiPort: "The switch sets this to 4, but the 3DS rejects it if set to >3"

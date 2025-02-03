@@ -358,12 +358,8 @@ void RootTask::prepare_()
     // Create projection matrices.
 
     const rio::Window* window = rio::Window::instance();
-    // Set projection matrix
     {
-        // Calculate the aspect ratio based on the window dimensions
-        f32 aspect = f32(window->getWidth()) / f32(window->getHeight());
-        // Calculate the field of view (fovy) based on the given parameters
-        f32 fovy = 2 * atan2f(43.2f / aspect, 500.0f);
+        f32 fovy = 2 * atan2f(43.2f/* / aspect*/, 500.0f);
         // C_MTXPerspective(Mtx44 m, f32 fovy, f32 aspect, f32 near, f32 far)
         // PerspectiveProjection(f32 near, f32 far, f32 fovy, f32 aspect)
         // RFLiMakeIcon: C_MTXPerspective(projMtx, fovy, aspect, 500.0f, 700.0f)
@@ -374,7 +370,7 @@ void RootTask::prepare_()
             500.0f,  // near
             1000.0f, // far
             fovy,    // fovy
-            aspect   // aspect
+            1.0f    // aspect
         );
         // The near and far values define the depth range of the view frustum (500.0f to 700.0f)
 
@@ -479,7 +475,7 @@ void RootTask::createModel_()
 
     Model::InitArg arg = {
         .desc = {
-            .resolution = static_cast<FFLResolution>(FFL_RESOLUTION_TEX_256 | FFL_RESOLUTION_MIP_MAP_ENABLE_MASK),
+            .resolution = FFLResolution(FFL_RESOLUTION_TEX_256 | FFL_RESOLUTION_MIP_MAP_ENABLE_MASK),
             .allExpressionFlag = { .flags = { 1 << 0, 0, 0 } },
             .modelFlag = 1 << 0,
             .resourceType = FFL_RESOURCE_TYPE_HIGH,
@@ -507,7 +503,7 @@ void RootTask::createModel_()
     mpModel->mpBody = new BodyModel(&mpBodyModels[cBodyType]);
     mpModel->mpBody->initialize(mpModel, PANTS_COLOR_GRAY);
     if (mpModel->mpHeadwear != nullptr)
-        mpModel->mpHeadwear->initialize(mpModel, mpModel->getCharInfo()->favoriteColor);
+        mpModel->mpHeadwear->initialize(mpModel, FFLFavoriteColor(mpModel->getCharInfo()->favoriteColor));
 
     mCounter = 0.0f;
 }
@@ -544,17 +540,17 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
     if (req->verifyCharInfo)
     {
         // get verify char info reason, don't verify name
-        FFLiVerifyCharInfoReason verifyCharInfoReason =
+        FFLiVerifyReason verifyReason =
             FFLiVerifyCharInfoWithReason(&charInfo, false);
         // I think I want to separate making the model
         // and picking up CharInfo from the request LATER
         // and then apply it when I do that
 
-        if (verifyCharInfoReason != FFLI_VERIFY_CHAR_INFO_REASON_OK)
+        if (verifyReason != FFLI_VERIFY_REASON_OK)
         {
             // CHARINFO IS INVALID, FAIL!
             errMsg = "FFLiVerifyCharInfoWithReason (data verification) failed: "
-            + std::string(FFLiVerifyCharInfoReasonToString(verifyCharInfoReason))
+            + std::string(FFLiVerifyReasonToString(verifyReason))
             + "\n";
             RIO_LOG("%s", errMsg.c_str());
             errMsg = socketErrorPrefix + errMsg;
@@ -609,12 +605,12 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
     FFLResolution texResolution;
     if (req->texResolution < 0)
     { // if it is negative...
-        texResolution = static_cast<FFLResolution>(
+        texResolution = FFLResolution(
             static_cast<u32>(req->texResolution * -1) // remove negative
             | FFL_RESOLUTION_MIP_MAP_ENABLE_MASK); // enable mipmap
     }
     else
-        texResolution = static_cast<FFLResolution>(req->texResolution);
+        texResolution = FFLResolution(req->texResolution);
 
 #ifdef FFL_ENABLE_NEW_MASK_ONLY_FLAG
     // Enable special mode that will not initialize shapes.
@@ -622,7 +618,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         modelFlag |= FFL_MODEL_FLAG_NEW_MASK_ONLY;
 #endif
 
-    FFLResourceType resourceType = static_cast<FFLResourceType>(req->resourceType);
+    FFLResourceType resourceType = FFLResourceType(req->resourceType);
 
     // clamp minimum (-1) or maximum to default
     if (req->resourceType < 0 || req->resourceType >= FFL_RESOURCE_TYPE_MAX)
@@ -713,7 +709,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         // get headwear favorite color
         FFLFavoriteColor headwearColor = static_cast<FFLFavoriteColor>(req->headwearColor);
         if (headwearColor < 0 || headwearColor >= FFL_FAVORITE_COLOR_MAX)
-            headwearColor = mpModel->getCharInfo()->favoriteColor;
+            headwearColor = FFLFavoriteColor(mpModel->getCharInfo()->favoriteColor);
         // initialize headwear with charmodel
         mpModel->mpHeadwear->initialize(mpModel, headwearColor);
     }
@@ -749,10 +745,10 @@ rio::mdl::Model* RootTask::getBodyModel_(Model* pModel, BodyType type)
     RIO_ASSERT(type > -1); // make sure it does not stay -1
 
     FFLiCharInfo* pCharInfo = pModel->getCharInfo();
-    FFLGender genderTmp = pCharInfo->gender;
+    FFLGender genderTmp = FFLGender(pCharInfo->gender);
 
     // Clamp the value of gender.
-    const FFLGender gender = static_cast<FFLGender>(genderTmp % FFL_GENDER_MAX);
+    const FFLGender gender = FFLGender(genderTmp % FFL_GENDER_MAX);
 
     // Select body model.
     rio::mdl::Model* model = mpBodyModels[type].mpModels[gender]; // Based on gender.
@@ -1373,13 +1369,13 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
         }
         */
 
-        const FFLFavoriteColor originalFavoriteColor = pCharInfo->favoriteColor;
+        const FFLFavoriteColor originalFavoriteColor = FFLFavoriteColor(pCharInfo->favoriteColor);
         if (req->clothesColor >= 0
             // verify favorite color is in range here bc it is NOT verified in drawMiiBodyREAL
             && req->clothesColor < FFL_FAVORITE_COLOR_MAX
         )
             // change favorite color after drawing opa
-            pCharInfo->favoriteColor = static_cast<FFLFavoriteColor>(req->clothesColor);
+            pCharInfo->favoriteColor = FFLFavoriteColor(req->clothesColor);
 
         pModel->mpBody->draw(rotationMtx, view_mtx, projMtx);
         // restore original favorite color tho

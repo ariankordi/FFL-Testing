@@ -369,7 +369,7 @@ now, PickupCharInfo calls:
 * FFLiiVerifyCharInfo or FFLiIsNullMiiID are called.
   - i think FFLiIsNullMiiID is for if a mii is marked as deleted by setting its ID to null
   - FFLiiVerifyCharInfo -> FFLiVerifyCharInfoWithReason
-    + FFLiVerifyCharInfoReason is discarded here
+    + FFLiVerifyReason is discarded here
     + <b>FFLiVerifyCharInfoWithReason IS THE MOST LIKELY REASON</b>
 </pre>
 </details>

@@ -152,8 +152,8 @@ mediump float calculateDot(mediump vec3 light, mediump vec3 normal)
 
 // フラグメントシェーダーに入力される varying 変数
 in mediump vec4 v_color;          //!< 出力: 頂点の色
-in mediump vec4 v_position;       //!< 出力: 位置情報
-in mediump vec3 v_normal;         //!< 出力: 法線ベクトル
+in highp   vec4 v_position;       //!< 出力: 位置情報
+in highp   vec3 v_normal;         //!< 出力: 法線ベクトル
 in mediump vec3 v_tangent;        //!< 出力: 異方位
 in mediump vec2 v_texCoord;       //!< 出力: テクスチャー座標
 

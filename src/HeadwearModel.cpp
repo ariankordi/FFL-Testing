@@ -255,7 +255,7 @@ void HeadwearModel::prepareDraw_(rio::Matrix34f& localMtx, rio::Matrix34f& model
     };
 
     // hack: need to set favorite color
-    const FFLFavoriteColor originalFavoriteColor = pCharInfo->favoriteColor;
+    const FFLFavoriteColor originalFavoriteColor = FFLFavoriteColor(pCharInfo->favoriteColor);
     pCharInfo->favoriteColor = mAccessoryColorIndex;
 
     pShader->setModulate(modulateParam);

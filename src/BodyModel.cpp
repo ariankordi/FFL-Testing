@@ -298,10 +298,10 @@ void BodyModel::initializeSkeleton_()
 rio::mdl::Model* BodyModel::getBodyModel_()
 {
     FFLiCharInfo* pCharInfo = mpModel->getCharInfo();
-    FFLGender genderTmp = pCharInfo->gender;
+    FFLGender genderTmp = FFLGender(pCharInfo->gender);
 
     // Clamp the value of gender.
-    const FFLGender gender = static_cast<FFLGender>(genderTmp % FFL_GENDER_MAX);
+    const FFLGender gender = FFLGender(genderTmp % FFL_GENDER_MAX);
 
     // Select body model based on gender.
     rio::mdl::Model* model = mpBodyModel->mpModels[gender];

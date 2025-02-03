@@ -1,5 +1,13 @@
 #version 330 core
 
+#ifdef GL_ES
+precision highp float;
+#else
+#   define lowp
+#   define mediump
+#   define highp
+#endif
+
 #define VARYING_QUALIFIER out
 #define VARYING_INSTANCE Out
 

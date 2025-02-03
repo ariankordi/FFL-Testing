@@ -35,6 +35,20 @@ void GLTFExportCallback::SetMatrixFunc(void* pObj, const rio::BaseMtx44f* matrix
 }
 */
 
+// Friendly names for shape types to be used for meshes
+static const char* cMeshNames[FFL_MODULATE_TYPE_SHAPE_MAX] = {
+    // From Miitomo: asset/env/mii/mii_model.xml
+    "OpaFaceline",
+    "OpaBeard",
+    "OpaNose",
+    "OpaForehead",
+    "OpaHair",
+    "OpaCap",
+    "XluMask",
+    "XluNoseLine",
+    "XluGlass"
+};
+
 void GLTFExportCallback::DrawFunc(void* pObj, const FFLDrawParam* drawParam)
 {
     GLTFExportCallback* self = static_cast<GLTFExportCallback*>(pObj);
@@ -445,6 +459,10 @@ bool GLTFExportCallback::ExportModelInternal(const std::string& filename, std::o
 
         // Set primitive mode based on the mesh's primitive type
         primitive.mode = MapPrimitiveMode(meshData.primitiveType);
+
+        RIO_ASSERT(meshData.modulateType < FFL_MODULATE_TYPE_SHAPE_MAX); // do not include mask tex
+        // Set name of mesh depending on modulate type
+        gltfMesh.name = cMeshNames[meshData.modulateType];
 
         // Add modulate parameters to this primitive's extras for custom usage
         AddPrimitiveExtras(meshData, primitive);

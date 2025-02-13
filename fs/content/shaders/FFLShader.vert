@@ -66,6 +66,15 @@ void main()
         gl_Position = u_proj * v_position;
 
         v_normal = normalize(u_it * nrm_w.xyz);
+        // safe normalize
+        if (tan_w.xyz != vec3(0.0, 0.0, 0.0))
+        {
+            v_tangent = normalize(u_it * tan_w.xyz);
+        }
+        else
+        {
+            v_tangent = vec3(0.0, 0.0, 0.0);
+        }
         v_tangent = u_it * tan_w.xyz;
         v_texCoord = vec2(0.0, 0.0);
     }
@@ -74,7 +83,15 @@ void main()
         v_position = u_mv * a_position;
         gl_Position = u_proj * v_position;
         v_normal = normalize(u_it * a_normal);
-        v_tangent = u_it * a_tangent;
+        // safe normalize
+        if (a_tangent.xyz != vec3(0.0, 0.0, 0.0))
+        {
+            v_tangent = normalize(u_it * a_tangent.xyz);
+        }
+        else
+        {
+            v_tangent = vec3(0.0, 0.0, 0.0);
+        }
         v_texCoord = a_texCoord;
     }
 

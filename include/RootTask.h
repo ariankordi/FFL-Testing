@@ -66,7 +66,7 @@ private:
     void calc_() override;
     void exit_() override;
 
-    void handleRenderRequest(char* buf, Model** ppModel, int socket);
+    void handleRenderRequest(RenderRequest* req, Model** ppModel, int socket);
 #ifndef NO_GLTF
     void handleGLTFRequest(RenderRequest* renderRequest);
 #endif
@@ -124,7 +124,7 @@ private:
 #endif
 
     rio::mdl::Model* getBodyModel_(Model* pModel, BodyType type);
-    void setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, rio::PerspectiveProjection* proj, rio::BaseMtx44f* projMtx, float* aspectHeightFactor, bool* isCameraPosAbsolute, bool* willDrawBody, FFLiCharInfo* pCharInfo);
+    void setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, rio::PerspectiveProjection* proj, rio::BaseMtx44f* projMtx, f32* aspectHeightFactor, bool* isCameraPosAbsolute, bool* willDrawBody, FFLiCharInfo* pCharInfo);
 
 private:
     bool                mInitialized;

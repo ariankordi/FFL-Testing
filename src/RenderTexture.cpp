@@ -150,9 +150,9 @@ void copyAndSendRenderBufferToSocket(rio::Texture2D* texture, int socket, int ss
         float position[2]; // R32G32 for position
         float texcoord[2]; // R32G32 for texCoord
     };
-    static const int cQuadStride = sizeof(QuadVertex); // Stride
+    static const s32 cQuadStride = sizeof(QuadVertex); // Stride
 
-    static const int cQuadVtxNum = 4;
+    static const s32 cQuadVtxNum = 4;
     // Quad vertex data in a struct format
     static const QuadVertex quadTriStripVertices[cQuadVtxNum] = {
 #ifndef RIO_NO_CLIP_CONTROL

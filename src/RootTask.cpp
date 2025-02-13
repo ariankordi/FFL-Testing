@@ -27,11 +27,11 @@
 #include <string>
 
 // Forward declarations
-//void handleRenderRequest(char* buf, Model* pModel, int socket);
-
+//void handleRenderRequest(RenderRequest* req, Model** ppModel, int socket);
 #ifndef NO_GLTF
+#include <GLTFExportCallback.h>
 void handleGLTFRequest(RenderRequest* renderRequest, Model* pModel, int socket);
-#endif
+#endif // NO_GLTF
 
 // Static members.
 const char* RootTask::sServerOnlyFlag     = nullptr;
@@ -245,7 +245,7 @@ void RootTask::loadResourceFiles_()
 
         FFLGetResourcePath(resPath,
             static_cast<u32>(sizeof(resPath)),
-            static_cast<FFLResourceType>(resourceType), false); // last arg: linear gamma (LG) resource?
+            FFLResourceType(resourceType), false); // last arg: linear gamma (LG) resource?
 
         std::vector<std::string> pathsToTry; // list of paths
         // Convert absolute resPath to std::filesystem::path.
@@ -984,7 +984,7 @@ static f32 getTransformedZ(const rio::BaseMtx34f model_mtx, const rio::BaseMtx34
 }
 
 // TODO: this is still using class instances: getBodyModel
-void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
+void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int socket)
 {
     // Cast pModel. ppModel is provided so that
     // it can be deleted from inside this function
@@ -998,8 +998,7 @@ void RootTask::handleRenderRequest(char* buf, Model** ppModel, int socket)
     }
     RIO_LOG("handleRenderRequest: socket handle: %d\n", socket);
 
-    // hopefully renderrequest is proper
-    RenderRequest* req = reinterpret_cast<RenderRequest*>(buf);
+    //RIO_LOG("handleRenderRequest: socket handle: %d\n", socket);
 
     if (req->responseFormat == RESPONSE_FORMAT_GLTF_MODEL)
     {
@@ -1518,7 +1517,9 @@ void RootTask::calc_()
 
     if (hasSocketRequest)
     {
-        handleRenderRequest(buf, &mpModel, mServerSocket);
+        // hopefully renderrequest is proper
+        RenderRequest* req = reinterpret_cast<RenderRequest*>(buf);
+        handleRenderRequest(req, &mpModel, mServerSocket);
         if (!sServerOnlyFlag)
         {
             rio::Window::instance()->makeContextCurrent();
@@ -1599,8 +1600,7 @@ void RootTask::calc_()
 
 #ifndef NO_GLTF
 
-#include <GLTFExportCallback.h>
-
+// exportAndSendGLTF
 void handleGLTFRequest(RenderRequest* req, Model* pModel, int socket)
 {
     // Initialize ExportShader

@@ -213,7 +213,9 @@ void coreDataToCharInfoNX(charInfo* dest, const coreData* src)
     dest->mole_y = src->mole_y;
 
     // Copy nickname
-    memcpy(dest->nickname, src->nickname, sizeof(src->nickname));
+    memcpy(dest->nickname, src->nickname, sizeof(src->nickname) - 2);
+    // Nickname is null-terminated, so leave one byte out
+    // in case the name is NOT null-terminated in source CharInfo
 
     // Other fields of charInfo will remain zero-initialized.
 }

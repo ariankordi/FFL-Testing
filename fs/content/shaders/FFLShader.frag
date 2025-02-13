@@ -247,7 +247,7 @@ void main()
 //#endif
 
     // avoids little outline around mask elements
-    if(u_mode != FFL_MODULATE_MODE_CONSTANT && color.a == 0.0f)
+    if(u_mode != FFL_MODULATE_MODE_CONSTANT && color.a == 0.0)
     {
         discard;
     }

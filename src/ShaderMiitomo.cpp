@@ -683,7 +683,7 @@ void ShaderMiitomo::setMaterial_(const FFLModulateType modulateType)
         {
             //mShader.setUniform(0.00f, 0.00f, 0.00f, mVertexUniformLocation[VERTEX_UNIFORM_EYE_PT], u32(-1));
             mShader.setUniform(false, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_LIGHT_ENABLE]);
-            return; // no other uniforms are set
+            [[fallthrough]]; // also has alpha test
         }
         case FFL_MODULATE_TYPE_SHAPE_MASK:
             [[fallthrough]];

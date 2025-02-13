@@ -153,6 +153,8 @@ static void UpdateScale(rio::Vector3f &scaleOut, VriableIconBodyBoneKind bone, c
         // Do not update scale.mSkeletonMatrix
         break;
     case VriableIconBodyBoneKind_Chest:     [[fallthrough]];
+    // Includes neck, not the actual head:
+    case VriableIconBodyBoneKind_Head:      [[fallthrough]];
     case VriableIconBodyBoneKind_Chest2:    [[fallthrough]];
     case VriableIconBodyBoneKind_Hip:       [[fallthrough]];
     case VriableIconBodyBoneKind_FootL1:    [[fallthrough]];
@@ -196,24 +198,12 @@ static void UpdateScale(rio::Vector3f &scaleOut, VriableIconBodyBoneKind bone, c
         scaleOut.y = bodyScale.x;
         scaleOut.z = bodyScale.x;
         break;
-    case VriableIconBodyBoneKind_Head:
-    {
-        // Head: XYZ, with Y clamped to 1.0.
-        // NOTE that this is not actually used
-        // as the model matrix for the head.
-        scaleOut.x = bodyScale.x;
-        float one = 1.0f;
-        // Clamp Y maximum to 1.0.
-        float limitedY = (bodyScale.y < one) ? bodyScale.y : one;
-        scaleOut.y = limitedY;
-        scaleOut.z = bodyScale.z;
-        // The actual model matrix for the head
-        // should be the original unscaled matrix
-        // but with only translation vector scaled
-        break;
-    }
+    // NOTE: For the Head bone, real UpdateBodyScale function
+    // uses XYZ scale but clamps Y to 1.0. However, this only
+    // actually applies to the area of the body NEAR the
+    // head, or the neck, and NOT for the head itself
     default:
-        RIO_ASSERT(false && "what kind of bone is this?????");
+        RIO_ASSERT(false && "UpdateScale: Unexpected bone ID passed in.");
     }
     return;
 }

@@ -36,9 +36,9 @@ public:
     void Draw(const FFLDrawParam& drawParam);
 
     /**
-     * @brief Sets the character model for exporting additional masks and related data.
+     * @brief Sets the CharModel for exporting additional masks and related data.
      *
-     * @param pCharModel Pointer to the character model.
+     * @param pCharModel Pointer to FFLCharModel.
      */
     void SetCharModel(FFLCharModel* pCharModel)
     {
@@ -123,6 +123,14 @@ private:
     bool ExportModelInternal(const std::string& filename, std::ostream* outStream);
 
     // Helper functions for processing and exporting model data
+
+
+    /**
+     * @brief Ensures that the KHR_materials_variants extension is added to the model.
+     *
+     * @param model The GLTF to add the extension to.
+     */
+    void AddVariantExtension(tinygltf::Model& model);
 
     /**
      * @brief Unpacks a 10_10_10_2 packed normal into separate float components.
@@ -285,9 +293,9 @@ private:
      * @param meshData The mesh data containing material parameters.
      * @param model The GLTF model being constructed.
      * @param primitive The GLTF primitive to which the material will be assigned.
-     * @param meshIndex The index of the current mesh for naming purposes.
+     * @param mesh The current mesh for naming purposes.
      */
-    void AssignMaterialToPrimitive(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, size_t meshIndex);
+    void AssignMaterialToPrimitive(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, tinygltf::Mesh& mesh);
 
     /**
      * @brief Assigns a material to the primitive when no texture is present.
@@ -295,9 +303,9 @@ private:
      * @param meshData The mesh data containing material parameters.
      * @param model The GLTF model being constructed.
      * @param primitive The GLTF primitive to which the material will be assigned.
-     * @param meshIndex The index of the current mesh for naming purposes.
+     * @param mesh The current mesh for naming purposes.
      */
-    void AssignMaterialWithoutTexture(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, size_t meshIndex);
+    void AssignMaterialWithoutTexture(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, tinygltf::Mesh& mesh);
 
     /**
      * @brief Adds a node to the default scene in the GLTF model.
@@ -308,20 +316,21 @@ private:
     void AddNodeToScene(tinygltf::Model& model, int nodeIndex);
 
     /**
-     * @brief Handles additional mask textures associated with the character model.
+     * @brief Handles additional mask textures associated with the CharModel.
      *
      * @param model The GLTF model being constructed.
      * @param bufferData The buffer data being accumulated.
      * @param bufferSize The current size of the buffer.
      */
-    void HandleAdditionalMaskTextures(tinygltf::Model& model, std::vector<unsigned char>& bufferData, size_t& bufferSize);
+    //void HandleAdditionalMaskTextures(tinygltf::Model& model, std::vector<unsigned char>& bufferData, size_t& bufferSize);
+    void AssignMaskMaterialVariants(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, std::vector<unsigned char>& bufferData, size_t& bufferSize);
 
     /**
-     * @brief Includes character model information such as FFLiCharInfo and FFLPartsTransform into the GLTF model's extras.
+     * @brief Includes CharModel information such as FFLiCharInfo and FFLPartsTransform into the GLTF model's extras.
      *
      * @param model The GLTF model being constructed.
      */
-    void IncludeCharacterModelInfo(tinygltf::Model& model);
+    void IncludeCharModelInfo(tinygltf::Model& model);
 
     /**
      * @brief Writes the GLTF model to a file or output stream.
@@ -334,7 +343,7 @@ private:
      */
     bool WriteModelToFileOrStream(const tinygltf::Model& model, const std::string& filename, std::ostream* outStream);
 
-    FFLCharModel* mpCharModel;                ///< Pointer to the character model
+    FFLCharModel* mpCharModel;                ///< Pointer to CharModel associated with this model
 
     std::vector<MeshData> mMeshes;            ///< Collection of meshes to be exported
 

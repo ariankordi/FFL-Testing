@@ -1,22 +1,122 @@
 #ifndef NO_GLTF
 
-#include "GLTFExportCallback.h"
-#include "nn/ffl/FFLDrawParam.h"
+#include <GLTFExportCallback.h>
+#include <nn/ffl/FFLDrawParam.h>
 #include <cstring>
 #include <limits>
 #include <cstdio>
 #include <cassert>
 #include <iostream>
+
+#include <algorithm>
+#include <sstream>
+#include <iomanip>
+
 #include <misc/rio_MemUtil.h>
 
 // Include stb_image_write implementation
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "for_gltf/stb_image_write.h"
 
+// Define model.asset.generator string.
+#define GLTF_ASSET_GENERATOR_STRING "https://mii-unsecure.ariankordi.net (or if this site does not exist anymore: https://github.com/ariankordi/FFL-Testing/tree/renderer-server-prototype)"
+
 // Defined in IMPLEMENTATION sector in tinygltf.h but needed here
-namespace tinygltf {
+namespace tinygltf
+{
     std::string base64_encode(unsigned char const*, unsigned int len);
     std::string base64_decode(std::string const& encoded_string);
+}
+
+void strUTF16ToUTF8(char* dst, const u16* src, s32 n); // DataUtils.cpp
+
+namespace
+{
+    // converts char* buffer to hex representation
+    std::string charToHex(char* input, int len)
+    {
+        std::ostringstream hexStream;
+        hexStream << std::hex << std::setfill('0'); // Set hex formatting
+        int pos = 0;
+        while (*input && pos < len)
+        {
+            hexStream << std::setw(2) << static_cast<int>(static_cast<unsigned char>(*input));
+            ++input;
+        }
+
+        return hexStream.str();
+    }
+
+    /*
+    // converts u16* array of utf16 characters
+    std::string u16UTF16ToUTF8(const u16* pBuffer, int length)
+    {
+        wchar_t tmp[11]; // 11 characters max
+        RIO_ASSERT(length <= int(sizeof(tmp) / sizeof(wchar_t)));
+
+        for (int i = 0; i < length; i++)
+            tmp[i] = pBuffer[i];
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+
+        // catch exceptions thrown by to_bytes():
+        try
+        {
+            return converter.to_bytes(tmp); // wchar_t to string
+        } catch (const std::range_error&)
+        {
+            RIO_LOG("u16UTF16ToUTF8: caught std::range_error\n");
+            return ""; // return blank string
+        }
+    }
+    */
+
+    // gets FFLAdditionalInfo from CharInfo and crafts object
+    tinygltf::Value::Object getAdditionalInfoToObject(FFLiCharInfo* pCharInfo)
+    {
+        FFLAdditionalInfo additionalInfo;
+        tinygltf::Value::Object additionalInfoObject;
+        FFLResult result = FFLGetAdditionalInfo(&additionalInfo, FFL_DATA_SOURCE_DIRECT_POINTER, pCharInfo, 0, false);
+        // should always work for charinfo copying, unless verification failed (direct pointer avoids this)
+        //RIO_ASSERT(result == FFL_RESULT_OK);
+        if (result != FFL_RESULT_OK)
+            return additionalInfoObject; // will be null
+
+        const std::string createIDHex = charToHex(reinterpret_cast<char*>(&additionalInfo.createID), 10);
+
+        // Copy name and creatorName to UTF-8 strings.
+        NN_STATIC_ASSERT(sizeof(additionalInfo.name) == sizeof(additionalInfo.creator));
+
+        static const int cStringLength = (sizeof(additionalInfo.name) / sizeof(u16));
+        // Account for worst case, 4 bytes per character.
+        char name[cStringLength * 4];
+        char creatorName[cStringLength * 4];
+        strUTF16ToUTF8(name, additionalInfo.name, cStringLength);
+        strUTF16ToUTF8(creatorName, additionalInfo.creator, cStringLength);
+
+        additionalInfoObject = tinygltf::Value::Object{
+            {"name", tinygltf::Value(name)},
+            {"creator", tinygltf::Value(creatorName)},
+            {"createID", tinygltf::Value(createIDHex)},
+            {"skinColor", tinygltf::Value(std::vector<tinygltf::Value>{
+                tinygltf::Value(additionalInfo.skinColor.r),
+                tinygltf::Value(additionalInfo.skinColor.g),
+                tinygltf::Value(additionalInfo.skinColor.b),
+                tinygltf::Value(additionalInfo.skinColor.a)
+            })},
+            {"facelineType", tinygltf::Value(additionalInfo.facelineType)},
+            {"hairType", tinygltf::Value(additionalInfo.hairType)},
+            {"gender", tinygltf::Value(static_cast<int>(additionalInfo.gender))},
+            {"birthMonth", tinygltf::Value(static_cast<int>(additionalInfo.birthMonth))},
+            {"birthDay", tinygltf::Value(static_cast<int>(additionalInfo.birthDay))},
+            {"favoriteColor", tinygltf::Value(static_cast<int>(additionalInfo.favoriteColor))},
+            {"height", tinygltf::Value(static_cast<int>(additionalInfo.height))},
+            {"build", tinygltf::Value(static_cast<int>(additionalInfo.build))},
+            {"ngWord", tinygltf::Value(static_cast<int>(additionalInfo.ngWord))},
+            {"fontRegion", tinygltf::Value(static_cast<int>(additionalInfo.fontRegion))},
+            {"hairFlip", tinygltf::Value(static_cast<int>(additionalInfo.hairFlip))},
+        };
+        return additionalInfoObject;
+    }
 }
 
 GLTFExportCallback::GLTFExportCallback()
@@ -435,7 +535,8 @@ bool GLTFExportCallback::ExportModelInternal(const std::string& filename, std::o
 
     // Set asset information
     model.asset.version = "2.0";
-    model.asset.generator = "https://mii-unsecure.ariankordi.net (or if this site does not exist anymore: https://github.com/ariankordi)";
+    if (strlen(GLTF_ASSET_GENERATOR_STRING) > 0)
+        model.asset.generator = GLTF_ASSET_GENERATOR_STRING;
 
     // Initialize buffer and associated data structures
     tinygltf::Buffer buffer;
@@ -468,15 +569,21 @@ bool GLTFExportCallback::ExportModelInternal(const std::string& filename, std::o
         AddPrimitiveExtras(meshData, primitive);
 
         // Handle texture assignment and processing
-        if (meshData.texture != nullptr)
+        if (meshData.modulateType == FFL_MODULATE_TYPE_SHAPE_MASK)
         {
+            // Special case for mask
+            AssignMaskMaterialVariants(meshData, model, primitive, bufferData, bufferSize);
+        }
+        else if (meshData.texture != nullptr)
+        {
+            // Process texture and assign material
             ProcessTexture(meshData, model, bufferData, bufferSize);
-            AssignMaterialToPrimitive(meshData, model, primitive, meshIndex);
+            AssignMaterialToPrimitive(meshData, model, primitive, gltfMesh);
         }
         else
         {
             // Assign material without texture
-            AssignMaterialWithoutTexture(meshData, model, primitive, meshIndex);
+            AssignMaterialWithoutTexture(meshData, model, primitive, gltfMesh);
         }
 
         // Material has been added to the model
@@ -499,20 +606,31 @@ bool GLTFExportCallback::ExportModelInternal(const std::string& filename, std::o
     }
 
     // Handle additional mask textures if present
-    HandleAdditionalMaskTextures(model, bufferData, bufferSize);
-
+    //HandleAdditionalMaskTextures(model, bufferData, bufferSize);
     // Assign buffer data to the model
     buffer.data = bufferData;
     model.buffers.push_back(buffer);
 
-    // Include character model information in the GLTF extras if available
-    IncludeCharacterModelInfo(model);
+    // Include CharModel info in the GLTF extras
+    IncludeCharModelInfo(model);
 
     // Write the model to a GLTF file or output stream
     return WriteModelToFileOrStream(model, filename, outStream);
 }
 
 //------------------------ Helper Functions for ExportModelInternal ------------------------
+
+/**
+ * @brief Ensures that the KHR_materials_variants extension is added to the model.
+ *
+ * @param model The GLTF to add the extension to.
+ */
+void GLTFExportCallback::AddVariantExtension(tinygltf::Model& model)
+{
+    // Make sure KHR_materials_variants is declared as used.
+    if (std::find(model.extensionsUsed.begin(), model.extensionsUsed.end(), "KHR_materials_variants") == model.extensionsUsed.end())
+        model.extensionsUsed.push_back("KHR_materials_variants");
+}
 
 /**
  * @brief Processes mesh attributes such as positions, normals, texcoords, etc., and adds them to the GLTF primitive.
@@ -914,12 +1032,12 @@ int GLTFExportCallback::AddTextureToModel(tinygltf::Model& model, int imageIndex
  * @param meshData The mesh data containing material parameters.
  * @param model The GLTF model being constructed.
  * @param primitive The GLTF primitive to which the material will be assigned.
- * @param meshIndex The index of the current mesh.
+ * @param mesh The current mesh.
  */
-void GLTFExportCallback::AssignMaterialToPrimitive(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, size_t meshIndex)
+void GLTFExportCallback::AssignMaterialToPrimitive(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, tinygltf::Mesh& mesh)
 {
     tinygltf::Material material;
-    material.name = "Material_" + std::to_string(meshIndex);
+    material.name = "Material_" + mesh.name;
 
     if (meshData.modulateMode == 0) // FFL_MODULATE_MODE_CONSTANT
     {
@@ -1008,12 +1126,12 @@ void GLTFExportCallback::AssignMaterialToPrimitive(MeshData& meshData, tinygltf:
  * @param meshData The mesh data containing material parameters.
  * @param model The GLTF model being constructed.
  * @param primitive The GLTF primitive to which the material will be assigned.
- * @param meshIndex The index of the current mesh.
+ * @param mesh The current mesh.
  */
-void GLTFExportCallback::AssignMaterialWithoutTexture(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, size_t meshIndex)
+void GLTFExportCallback::AssignMaterialWithoutTexture(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, tinygltf::Mesh& mesh)
 {
     tinygltf::Material material;
-    material.name = "Material_" + std::to_string(meshIndex);
+    material.name = "Material_" + mesh.name;
 
     // Default handling for other modulation modes without texture
     material.pbrMetallicRoughness.baseColorFactor = {
@@ -1066,105 +1184,173 @@ void GLTFExportCallback::AddNodeToScene(tinygltf::Model& model, int nodeIndex)
     }
 }
 
-/**
- * @brief Handles additional mask textures associated with the character model.
- *
- * @param model The GLTF model being constructed.
- * @param bufferData The buffer data being accumulated.
- * @param bufferSize The current size of the buffer.
- */
-void GLTFExportCallback::HandleAdditionalMaskTextures(tinygltf::Model& model, std::vector<unsigned char>& bufferData, size_t& bufferSize)
+void GLTFExportCallback::AssignMaskMaterialVariants(MeshData& meshData, tinygltf::Model& model, tinygltf::Primitive& primitive, std::vector<unsigned char>& bufferData, size_t& bufferSize)
 {
-    if (mpCharModel != nullptr)
+    // List of names to store in the top-level variant list.
+    std::vector<tinygltf::Value> variantList;
+    // Map expression index to variant index.
+    std::unordered_map<int, int> expressionToVariantIndex;
+    int variantCounter = 0;
+
+    // This will hold our variant mappings.
+    std::vector<tinygltf::Value> variantMappings;
+
+    // Assume mpCharModel is non-null.
+    FFLiCharModel* pCharModel = reinterpret_cast<FFLiCharModel*>(mpCharModel);
+    RIO_ASSERT(pCharModel);
+
+    // Index for primary expression material.
+    int primaryMaterial = -1;
+
+    // Loop over all possible expressions.
+    for (int expr = 0; expr < FFL_EXPRESSION_MAX; ++expr)
     {
-        FFLiCharModel* pCharModel = reinterpret_cast<FFLiCharModel*>(mpCharModel);
-        for (int expr = 0; expr < FFL_EXPRESSION_MAX; ++expr)
+        // Skip current expression.
+        //if (expr == pCharModel->expression)
+        //    continue;
+        // More than one expression found.
+        //AddVariantExtension(model); // Ensure this is added.
+
+        FFLiRenderTexture* renderTexture = pCharModel->maskTextures.pRenderTextures[expr];
+        if (!renderTexture || !renderTexture->pTexture2D)
+            continue;
+        rio::Texture2D* texture = renderTexture->pTexture2D;
+
+        // Add the current expression as a variant.
+        expressionToVariantIndex[expr] = variantCounter;
+        variantList.push_back(tinygltf::Value(tinygltf::Value::Object{
+            { "name", tinygltf::Value(
+                "Expression_" + std::to_string(expr)
+            ) }
+        }));
+        variantCounter++;  // Increment for the next valid variant
+
+        // Check if texture is already exported
+        //if (mTextureMap.find(texture) != mTextureMap.end())
+        //    continue;
+
+        // Extract texture to RGBA
+        std::vector<unsigned char> rgbaData;
+        int texWidth = 0, texHeight = 0;
+        if (!ExtractTextureToRGBA(texture, rgbaData, &texWidth, &texHeight))
         {
-            if (expr == pCharModel->expression)
-                continue;
-
-            FFLiRenderTexture* renderTexture = pCharModel->maskTextures.pRenderTextures[expr];
-            if (renderTexture == nullptr || renderTexture->pTexture2D == nullptr)
-                continue;
-
-            rio::Texture2D* texture = renderTexture->pTexture2D;
-
-            // Check if texture is already exported
-            if (mTextureMap.find(texture) != mTextureMap.end())
-                continue;
-
-            // Extract texture to RGBA
-            std::vector<unsigned char> rgbaData;
-            int texWidth, texHeight;
-            bool success = ExtractTextureToRGBA(texture, rgbaData, &texWidth, &texHeight);
-            if (!success)
-            {
-                RIO_LOG("Failed to extract mask texture for expression %d\n", expr);
-                continue;
-            }
-
-            // Encode RGBA data to PNG
-            std::vector<unsigned char> pngData;
-            if (!EncodeRGBADataToPNG(rgbaData, texWidth, texHeight, pngData))
-            {
-                RIO_LOG("Failed to encode mask texture to PNG for expression %d\n", expr);
-                continue;
-            }
-
-            // Add the PNG data to the buffer and create a BufferView
-            int imageIndex = AddImageToModel(model, bufferData, bufferSize, pngData, "MaskTexture_" + std::to_string(expr));
-
-            // Create a GLTF Texture and Sampler for the mask texture
-            int textureIndex = AddTextureToModel(model, imageIndex);
-            model.textures.back().name = "MaskTexture_" + std::to_string(expr);
-
-            // Map the texture to avoid duplicate entries
-            mTextureMap[texture] = textureIndex;
+            RIO_LOG("Failed to extract mask texture for expression %d\n", expr);
+            continue;
         }
+        // Encode RGBA data to PNG
+        std::vector<unsigned char> pngData;
+        if (!EncodeRGBADataToPNG(rgbaData, texWidth, texHeight, pngData))
+        {
+            RIO_LOG("Failed to encode mask texture to PNG for expression %d\n", expr);
+            continue;
+        }
+
+        // Add the PNG data to the buffer and create an image.
+        std::string imageName = "MaskTexture_" + std::to_string(expr);
+        int imageIndex = AddImageToModel(model, bufferData, bufferSize, pngData, imageName);
+
+        // Create a texture for the image.
+        int textureIndex = AddTextureToModel(model, imageIndex);
+
+        // Now create a new material for this expression.
+        tinygltf::Material maskMaterial;
+        maskMaterial.name = "Material_" + std::string(cMeshNames[FFL_MODULATE_TYPE_SHAPE_MASK]) + "_" + std::to_string(expr);
+
+        // Set baseColorTexture and other material
+        // params like FFL_MODULATE_MODE_TEXTURE_DIRECT
+        maskMaterial.pbrMetallicRoughness.baseColorTexture.index = textureIndex;
+        maskMaterial.pbrMetallicRoughness.baseColorTexture.texCoord = 0;
+        maskMaterial.alphaMode = "MASK";
+        maskMaterial.doubleSided = (meshData.cullMode == FFL_CULL_MODE_NONE);
+
+        // Add this new material to the model.
+        model.materials.push_back(maskMaterial);
+        int materialIndex = static_cast<int>(model.materials.size() - 1);
+        if (expr == pCharModel->expression) // Current expression?
+        {
+            primaryMaterial = materialIndex;
+            // Change material name to remove expression index
+            //model.materials[materialIndex].name = "Material_" + std::string(cMeshNames[FFL_MODULATE_TYPE_SHAPE_MASK]);
+        }
+
+        // Build the variant mapping object.
+        // The KHR extension expects each mapping to include:
+        // - "material": the material index for this variant.
+        // - "variants": an array of variant indices
+
+        // Correctly reference the dynamically assigned variant index
+        int variantIndex = expressionToVariantIndex[expr];
+        tinygltf::Value mapping(tinygltf::Value::Object{
+            {"material", tinygltf::Value(materialIndex)},
+            { "variants", tinygltf::Value(std::vector<tinygltf::Value>{ tinygltf::Value(variantIndex) }) },
+            // Add expression index as an extra.
+            {"extras", tinygltf::Value(tinygltf::Value::Object{
+                {"expression", tinygltf::Value(expr)}
+            })}
+        });
+        variantMappings.push_back(mapping);
+    }
+
+    // Set primary material index.
+    primitive.material = primaryMaterial;
+
+    // If any mappings were created, add the extension to the primitive.
+    if (variantCounter > 1)
+    {
+        AddVariantExtension(model); // Ensure this is added.
+        if (!variantMappings.empty())
+        {
+            tinygltf::Value khrVariants(tinygltf::Value::Object{
+                {"mappings", tinygltf::Value(variantMappings)}
+            });
+            // Attach the extension to the primitive.
+            primitive.extensions["KHR_materials_variants"] = khrVariants;
+        }
+        model.extensions["KHR_materials_variants"] = tinygltf::Value(tinygltf::Value::Object{
+            { "variants", tinygltf::Value(variantList) }
+        });
     }
 }
 
 /**
- * @brief Includes character model information such as FFLiCharInfo and FFLPartsTransform into the GLTF model's extras.
+ * @brief Includes CharModel information such as FFLiCharInfo and FFLPartsTransform into the GLTF model's extras.
  *
  * @param model The GLTF model being constructed.
  */
-void GLTFExportCallback::IncludeCharacterModelInfo(tinygltf::Model& model)
+void GLTFExportCallback::IncludeCharModelInfo(tinygltf::Model& model)
 {
-    if (mpCharModel != nullptr)
-    {
-        FFLiCharModel* pCharModel = reinterpret_cast<FFLiCharModel*>(mpCharModel);
-        FFLiCharInfo* pCharInfo = &pCharModel->charInfo;
+    if (mpCharModel == nullptr)
+        return;
 
-        // Encode FFLiCharInfo as base64
-        const std::string charInfoB64 = tinygltf::base64_encode(reinterpret_cast<unsigned char const*>(pCharInfo), sizeof(FFLiCharInfo));
+    FFLiCharModel* pCharModel = reinterpret_cast<FFLiCharModel*>(mpCharModel);
+    FFLiCharInfo* pCharInfo = &pCharModel->charInfo;
 
-        // Encode FFLPartsTransform
-        FFLPartsTransform partsTransform;
-        FFLGetPartsTransform(&partsTransform, mpCharModel);
+    // Encode FFLiCharInfo as base64
+    const std::string charInfoB64 = tinygltf::base64_encode(reinterpret_cast<unsigned char const*>(pCharInfo), sizeof(FFLiCharInfo));
 
-        tinygltf::Value::Object transformObj;
-        transformObj["hatTranslate"] = FFLVec3ToGltfValue(partsTransform.hatTranslate);
-        transformObj["headFrontRotate"] = FFLVec3ToGltfValue(partsTransform.headFrontRotate);
-        transformObj["headFrontTranslate"] = FFLVec3ToGltfValue(partsTransform.headFrontTranslate);
-        transformObj["headSideRotate"] = FFLVec3ToGltfValue(partsTransform.headSideRotate);
-        transformObj["headSideTranslate"] = FFLVec3ToGltfValue(partsTransform.headSideTranslate);
-        transformObj["headTopRotate"] = FFLVec3ToGltfValue(partsTransform.headTopRotate);
-        transformObj["headTopTranslate"] = FFLVec3ToGltfValue(partsTransform.headTopTranslate);
+    // Encode FFLPartsTransform
+    FFLPartsTransform partsTransform;
+    FFLGetPartsTransform(&partsTransform, mpCharModel);
 
-        // Include body build and height, u32 cast to s32
-        tinygltf::Value buildValue = tinygltf::Value(*reinterpret_cast<s32*>(&pCharInfo->build));
-        tinygltf::Value heightValue = tinygltf::Value(*reinterpret_cast<s32*>(&pCharInfo->height));
+    tinygltf::Value::Object transformObj;
+    transformObj["hatTranslate"] = FFLVec3ToGltfValue(partsTransform.hatTranslate);
+    transformObj["headFrontRotate"] = FFLVec3ToGltfValue(partsTransform.headFrontRotate);
+    transformObj["headFrontTranslate"] = FFLVec3ToGltfValue(partsTransform.headFrontTranslate);
+    transformObj["headSideRotate"] = FFLVec3ToGltfValue(partsTransform.headSideRotate);
+    transformObj["headSideTranslate"] = FFLVec3ToGltfValue(partsTransform.headSideTranslate);
+    transformObj["headTopRotate"] = FFLVec3ToGltfValue(partsTransform.headTopRotate);
+    transformObj["headTopTranslate"] = FFLVec3ToGltfValue(partsTransform.headTopTranslate);
 
-        // Add charInfo and partsTransform to the model's extras
-        model.asset.extras = tinygltf::Value(tinygltf::Value::Object{
-            {"build", buildValue},
-            {"height", heightValue},
-            // FFLiCharInfo value, not parsable or used by anything
-            {"charInfo", tinygltf::Value(charInfoB64)},
-            {"partsTransform", tinygltf::Value(transformObj)}
-        });
-    }
+    // Include FFLAdditionalInfo fields
+    tinygltf::Value::Object additionalInfoObject = getAdditionalInfoToObject(pCharInfo);
+
+    // Add charInfo and partsTransform to the model's extras
+    model.asset.extras = tinygltf::Value(tinygltf::Value::Object{
+        {"additionalInfo", tinygltf::Value(additionalInfoObject)},
+        // FFLiCharInfo value, not parsable or used by anything
+        {"charInfo", tinygltf::Value(charInfoB64)},
+        {"partsTransform", tinygltf::Value(transformObj)}
+    });
 }
 
 /**

@@ -324,16 +324,14 @@ FFLResult pickupCharInfoFromData(FFLiCharInfo* pCharInfo, const void* data, u32 
             [[fallthrough]];
         case INPUT_TYPE_FFL_MIIDATACORE:
         {
-            FFLiMiiDataCore miiDataCore;
-            rio::MemUtil::copy(&miiDataCore, data, sizeof(FFLiMiiDataCore));
+            FFLiMiiDataOfficial miiData;
+            rio::MemUtil::copy(&miiData, data, sizeof(FFLiMiiDataOfficial));
             // NOTE: FFLiMiiDataOfficial from CFL/FFL databases
             // are both in big endian, not sure how to detect that
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
-            miiDataCore.SwapEndian();
+            miiData.SwapEndian();
 #endif // __BYTE_ORDER__
-            FFLiMiiDataCore2CharInfo(pCharInfo, miiDataCore,
-            // const u16* pCreatorName, bool resetBirthday
-            NULL, false);
+            FFLiMiiDataOfficial2CharInfo(pCharInfo, miiData);
             break;
         }
         default: // unknown
@@ -341,4 +339,47 @@ FFLResult pickupCharInfoFromData(FFLiCharInfo* pCharInfo, const void* data, u32 
             break;
     }
     return FFL_RESULT_OK;
+}
+
+// Convert an UTF-16 string, not necessarily null terminated, to UTF-8.
+// Taken from the Linux kernel (GPL-2.0): drivers/firmware/efi/libstub/efi-stub-helper.c (efi_utf16_to_utf8)
+// Copyright 2011 Intel Corporation
+void strUTF16ToUTF8(char* dst, const u16* src, s32 n)
+{
+    s32 c;
+
+    while (n--)
+    {
+        c = *src++;
+        if (n && c >= 0xd800 && c <= 0xdbff && *src >= 0xdc00 && *src <= 0xdfff)
+        {
+            c = 0x10000 + ((c & 0x3ff) << 10) + (*src & 0x3ff);
+            src++;
+            n--;
+        }
+        if (c >= 0xd800 && c <= 0xdfff)
+            c = 0xfffd; // Unmatched surrogate
+
+        if (c < 0x80)
+        {
+            *dst++ = c;
+            continue;
+        }
+        if (c < 0x800)
+        {
+            *dst++ = 0xc0 + (c >> 6);
+            goto t1;
+        }
+        if (c < 0x10000)
+        {
+            *dst++ = 0xe0 + (c >> 12);
+            goto t2;
+        }
+        *dst++ = 0xf0 + (c >> 18);
+        *dst++ = 0x80 + ((c >> 12) & 0x3f);
+    t2:
+        *dst++ = 0x80 + ((c >> 6) & 0x3f);
+    t1:
+        *dst++ = 0x80 + (c & 0x3f);
+    }
 }

@@ -234,3 +234,5 @@ void studioToCharInfoNX(charInfo* dest, const charInfoStudio* src);
 void studioURLObfuscationDecode(char* data);
 void coreDataToCharInfoNX(charInfo* dest, const coreData* src);
 FFLResult pickupCharInfoFromData(FFLiCharInfo* pCharInfo, const void* data, u32 dataLength, bool verifyCRC16);
+// Utility:
+void strUTF16ToUTF8(char* dst, const u16* src, s32 n);

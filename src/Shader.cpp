@@ -754,7 +754,7 @@ void Shader::draw_(const FFLDrawParam& draw_param)
             else if (location != -1) // Disable attributes without corresponding VS inputs.
                 RIO_GL_CALL(glDisableVertexAttribArray(location));
         }
-#endif
+#endif // RIO_IS_WIN
 
         // Draw elements
         rio::Drawer::DrawElements(

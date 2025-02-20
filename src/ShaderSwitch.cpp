@@ -63,36 +63,37 @@ const rio::BaseVec4f& getColorUniform(const FFLColor& color)
     return reinterpret_cast<const rio::BaseVec4f&>(color.r);
 }
 
-// NOTE: there isn't a concrete way to determine the gamma type
-// I don't know how it's being set OR if the decomp provides a way to set it
-//static bool sGammaType = FFLiUseOffScreenSrgbFetch() ? 0 : 1;//1 : 0;
+#ifndef FFL_USE_LINEAR_GAMMA
 const bool sGammaType = 1;
+#else
+const bool sGammaType = 0;
+#endif
 
 // MATERIALS SECTION!!!!!
 // nn::mii::Material contains DrawParamMaterial
 
 struct Color3 {
-    float r;
-    float g;
-    float b;
+    f32 r;
+    f32 g;
+    f32 b;
 };
 
 struct SpecularMaterial {
     Color3 color;
-    float factorA;
-    float factorB;
-    float shinness;
+    f32    factorA;
+    f32    factorB;
+    f32    shinness;
 };
 
 struct RimLightMaterial {
     Color3 color;
-    float power;
-    float width;
+    f32    power;
+    f32    width;
 };
 
 struct DrawParamMaterial {
-    float halfLambertFactor;
-    float sssSpecularBlendFactor;
+    f32    halfLambertFactor;
+    f32    sssSpecularBlendFactor;
     Color3 sssColor;
     SpecularMaterial specular;
     RimLightMaterial rimLight;

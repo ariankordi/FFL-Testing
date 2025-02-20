@@ -722,9 +722,18 @@ void GLTFExportCallback::AddAttributeToBuffer(const std::vector<T>& data, tinygl
     accessor.type = type;
     accessor.normalized = normalized;
 
-    // Calculate min and max values for position attribute
+    // Assign bounding box for position attribute.
     if (attributeName == "POSITION")
+    {
         CalculateAccessorMinMax(data, accessor);
+        /*
+        // Use bounding box from CharModel.
+        FFLBoundingBox boundingBox;
+        FFLGetBoundingBox(&boundingBox, mpCharModel);
+        accessor.minValues = { boundingBox.min.x, boundingBox.min.y, boundingBox.min.z };
+        accessor.maxValues = { boundingBox.max.x, boundingBox.max.y, boundingBox.max.z };
+        */
+    }
 
     model.accessors.push_back(accessor);
     int accessorIndex = static_cast<int>(model.accessors.size() - 1);

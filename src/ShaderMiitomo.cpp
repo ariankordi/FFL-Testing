@@ -410,7 +410,7 @@ void ShaderMiitomo::setLightDirection(const rio::Vector3f direction)
     if (direction.z > -0.01)
         newLightDirection.z = direction.z;
     mLightDirAndType0 = newLightDirection;
-    mLightDirAndType1 = mLightDirAndType0; // ???
+    //mLightDirAndType1 = mLightDirAndType0; // ???
 }
 
 void ShaderMiitomo::bind(bool light_enable, FFLiCharInfo* pCharInfo)
@@ -591,20 +591,20 @@ static FFLColor multiplyColorIfNeeded(FFLModulateParam param, FFLColor color)
     if (
            param.type == FFL_MODULATE_TYPE_SHAPE_BEARD
         || param.type == FFL_MODULATE_TYPE_SHAPE_HAIR
-        || param.type == FFL_MODULATE_TYPE_MOLE // not sure
         || (param.mode == FFL_MODULATE_MODE_CONSTANT
             && param.type == CUSTOM_MATERIAL_PARAM_BODY) // body/favorite color
     )
     {
         // FUN_0056ba10 in libcocos2dcpp.so 2.4.0
+        static const f32 mul = 0.9019608f;
         return FFLColor {
-            color.r * 0.9019608f,
-            color.g * 0.9019608f,
-            color.b * 0.9019608f,
+            color.r * mul,
+            color.g * mul,
+            color.b * mul,
             color.a
         };
     }
-    return color; // do not multiply
+    return color; // no multiply needed
 }
 
 void ShaderMiitomo::setConstColor_(u32 ps_loc, FFLColor color)

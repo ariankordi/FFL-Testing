@@ -85,6 +85,12 @@ void BodyModel::initialize(Model* pModel, PantsColor pantsColor)
         mUseSkeleton = true;
         initializeSkeleton_();
     }
+    else
+    {
+        // mHeadModelMatrix is set by initializeSkeleton_()
+        // Without a skeleton, it is just translation
+        mHeadModelMatrix.makeT(getHeadTranslation());
+    }
 }
 
 rio::Vector3f BodyModel::getHeadTranslation()
@@ -116,12 +122,30 @@ rio::Vector3f BodyModel::getHeadTranslation()
 
 rio::Matrix34f BodyModel::getHeadModelMatrix()
 {
+    return mHeadModelMatrix;
+/*
     rio::Matrix34f mat;
 
-    // apply head translation
-    mat.makeT(getHeadTranslation());
+    if (mUseSkeleton)
+    {
+        // Skeleton path: use head bone matrix.
+        // The transformed head bone has to be used
+        // rather than the original pre-transformation.
+        const s32 bone = mpBodyModel->mHeadBoneID;
+        mat = mSkeletonMatrix[bone];
+
+        // Set scaled translation.
+        rio::Vector3f translate = getHeadTranslation();
+        SetMatrixTranslation(mat, translate);
+    }
+    else
+    {
+        // apply head translation
+        mat.makeT(getHeadTranslation());
+    }
 
     return mat;
+*/
 }
 
 
@@ -208,7 +232,21 @@ static void UpdateScale(rio::Vector3f &scaleOut, VriableIconBodyBoneKind bone, c
     return;
 }
 
-static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* parentBoneIDs, const s32 matrixCount, const rio::Vector3f bodyScale)
+
+// NOTE: Only shares name with this function but
+// not matching it whatsoever, the real StoreHeadWorldMatrix
+// actually extracts ONLY translation from the head bone
+// and applies that to identity matrix, dropping rotation
+static void StoreHeadWorldMatrix(rio::Matrix34f* pOut, rio::Matrix34f& matrix, rio::Vector3f scale)
+{
+    *pOut = matrix;
+    rio::Vector3f translate = GetMatrixTranslation(*pOut);
+    translate.setMul(translate, scale);
+    SetMatrixTranslation(*pOut, translate);
+}
+
+}
+void BodyModel::calculateWorldMatrix_(rio::Matrix34f* localMatrices, const s32* parentBoneIDs, const s32 matrixCount, const rio::Vector3f bodyScale)
 {
     // Meant to model the two loops done in: void nn::mii::detail::VariableIconBodyImpl::CalculateWorldMatrix(VariableIconBodyImpl *this,VariableIconBodyWorldMatrix *pOut,Gender gender,int build,int height);
     for (int bone = 0; bone < matrixCount; bone++)
@@ -229,7 +267,6 @@ static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* paren
 
         // Get translation/W-axis from matrix.
         rio::Vector3f w = GetMatrixTranslation(mtx);
-        // If boneKind == SklRoot => modifies the translation:
 
         // If this bone is skl_root (2), update translation.
         // Usually performed in: void nn::mii::detail::`anonymous namespace'::UpdateRotateTranslate(struct nn::util::general::MatrixRowMajor4x3fType *, enum nn::mii::detail::VriableIconBodyBoneKind, struct nn::util::Float3 const &)
@@ -258,6 +295,10 @@ static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* paren
 
     for (int bone = 0; bone < matrixCount; bone++)
     {
+        if (bone == mpBodyModel->mHeadBoneID)
+            // If this is the head bone, capture pre-scale.
+            StoreHeadWorldMatrix(&mHeadModelMatrix, localMatrices[bone], mScale);
+
         // localScale = scale difference in this bone.
         rio::Vector3f localScale = { 1.0f, 1.0f, 1.0f }; // Initialize
         // Get scale vector for this bone, not parent
@@ -270,7 +311,6 @@ static void CalculateWorldMatrix(rio::Matrix34f* localMatrices, const s32* paren
     }
 }
 
-}
 
 void BodyModel::initializeSkeleton_()
 {
@@ -282,7 +322,7 @@ void BodyModel::initializeSkeleton_()
         //if (parentBoneIDs[i] < 0) continue;
         //mSkeletonMatrix[i].setMul(mSkeletonMatrix[parentBoneIDs[i]], mSkeletonMatrix[i]);
     }
-    CalculateWorldMatrix(mSkeletonMatrix, parentBoneIDs, mpBodyModel->mBoneCount, mBodyScale);
+    calculateWorldMatrix_(mSkeletonMatrix, parentBoneIDs, mpBodyModel->mBoneCount, mBodyScale);
 }
 
 rio::mdl::Model* BodyModel::getBodyModel_()
@@ -299,6 +339,7 @@ rio::mdl::Model* BodyModel::getBodyModel_()
     RIO_ASSERT(model); // make sure it is not null
     return model;
 }
+
 
 // draws mii body based on charinfo's build/height
 // shader sets favorite and pants color

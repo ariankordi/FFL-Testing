@@ -625,6 +625,11 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         // may consider "default resource for shader"
         resourceType = getDefaultResourceType_();
 
+    // miitomo erroneously makes glasses larger so we will too
+    if (req->shaderType == SHADER_TYPE_MIITOMO)
+        modelFlag |= FFL_MODEL_FLAG_AFL_MODE;
+        //charInfo.parts.glassScale += 1;
+
     // otherwise just fall through and use default
     Model::InitArg arg = {
         .desc = {
@@ -672,24 +677,6 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
     ShaderType whichShader = SHADER_TYPE_WIIU;
     if (req->shaderType < SHADER_TYPE_MAX)
         whichShader = static_cast<ShaderType>(req->shaderType);
-
-    // this should happen after charinfo verification by the way
-    if (req->shaderType == SHADER_TYPE_MIITOMO)
-        // miitomo erroneously makes glasses larger so we will too
-        // NOTE: REMOVE LATER..??
-        charInfo.parts.glassScale += 1;
-
-    // shortcut, check if one of the following are true:
-    // using default body type which is going to be fflbodyres
-    // or body type is fflbodyres
-    else if ((req->bodyType == BODY_TYPE_DEFAULT_FOR_SHADER
-          && req->shaderType == SHADER_TYPE_WIIU_FFLICONWITHBODY)
-          || req->bodyType == BODY_TYPE_FFLBODYRES)
-    {
-        // this is roughly equivalent to no scale
-        charInfo.build = 82;
-        charInfo.height = 83;
-    }
 
     if (!mpModel->initialize(arg, *mpShaders[whichShader]))
     {
@@ -1151,6 +1138,15 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     {
         // Initializes scale factors:
         pModel->mpBody->initialize(pModel, pantsColor);
+        // shortcut, check if one of the following are true:
+        // using default body type which is going to be fflbodyres
+        // or body type is fflbodyres
+        if ((req->bodyType == BODY_TYPE_DEFAULT_FOR_SHADER
+              && req->shaderType == SHADER_TYPE_WIIU_FFLICONWITHBODY)
+              || req->bodyType == BODY_TYPE_FFLBODYRES)
+        {
+            pModel->mpBody->setBodyScale({ 1.0f, 1.0f, 1.0f });
+        }
     }
 
     camera.pos() = position;

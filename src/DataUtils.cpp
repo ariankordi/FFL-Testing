@@ -7,6 +7,7 @@
 
 #include <nn/ffl/FFLiMiiData.h>
 #include <nn/ffl/FFLiMiiDataCore.h>
+//#include <nn/ffl/FFLiRFLCreateID.h>
 #include <nn/ffl/detail/FFLiCrc.h>
 #include <Types.h>
 
@@ -292,6 +293,11 @@ FFLResult pickupCharInfoFromData(FFLiCharInfo* pCharInfo, const void* data, u32 
                 //reinterpret_cast<u16*>(&buf->data[0x36]), true // creator name
                 // name offset: https://github.com/SMGCommunity/Petari/blob/53fd4ff9db54cb1c91a96534dcae9f2c2ea426d1/libs/RVLFaceLib/include/RFLi_Types.h#L342
             );
+            /*
+            const FFLiRFLCreateID* createID = reinterpret_cast<FFLiRFLCreateID*>(&charDataRFL.m_CreateID);
+            static u64 notMyAuthorID = 0x69;
+            RIO_ASSERT(createID->Convert(&pCharInfo->createID, reinterpret_cast<FFLiAuthorID*>(&notMyAuthorID)));
+            */
             break;
         }
         case INPUT_TYPE_STUDIO_ENCODED:

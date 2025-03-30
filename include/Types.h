@@ -18,6 +18,7 @@ enum MiiDataInputType
 {
     INPUT_TYPE_FFL_MIIDATACORE,
     INPUT_TYPE_FFL_STOREDATA,
+    //INPUT_TYPE_FFL_CHARINFO, // TODO should not let users use this or clamp all u32 to 255 max (OOB too far access)
     INPUT_TYPE_RFL_CHARDATA,
     INPUT_TYPE_RFL_STOREDATA,
     INPUT_TYPE_NX_CHARINFO,

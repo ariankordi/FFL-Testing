@@ -229,6 +229,10 @@ public:
 
     void initialize(Model* pModel, PantsColor pantsColor);
 
+    void setBodyScale(rio::Vector3f scale)
+    {
+        mBodyScale = scale;
+    };
     void setPantsColor(PantsColor pantsColor)
     {
         mPantsColor = pantsColor;
@@ -247,6 +251,7 @@ public:
 private:
     rio::mdl::Model* getBodyModel_();
     void initializeSkeleton_();
+    void calculateWorldMatrix_(rio::Matrix34f* localMatrices, const s32* parentBoneIDs, const s32 matrixCount, const rio::Vector3f bodyScale);
 
     Model*                 mpModel;
     BodyModelItem*         mpBodyModel;

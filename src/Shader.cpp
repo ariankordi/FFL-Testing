@@ -432,6 +432,10 @@ void Shader::setLightDirection(const rio::Vector3f direction)
     mLightDir = newLightDirection;
 }
 
+#ifdef FFL_USE_ADJUST_MTX
+rio::Matrix34f g_MV = rio::Matrix34f::ident;
+#endif
+
 void Shader::bind(bool light_enable, FFLiCharInfo* pCharInfo)
 {
     mpCharInfo = pCharInfo;
@@ -459,6 +463,9 @@ void Shader::bind(bool light_enable, FFLiCharInfo* pCharInfo)
     mShader.setUniform(1, u32(-1), mPixelUniformLocation[PIXEL_UNIFORM_PARAMETER_MODE]); // FFL_PARAMETER_MODE_DEFAULT_1
 
     mShader.setUniform(0, mVertexUniformLocation[VERTEX_UNIFORM_SKIN_COUNT], u32(-1));
+#ifdef FFL_USE_ADJUST_MTX
+    g_MV = rio::Matrix34f::ident;
+#endif
 }
 
 void Shader::setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount)
@@ -474,10 +481,6 @@ void Shader::setBoneMatrix(rio::Matrix34f* mtx, s32 boneCount)
     }
     mShader.setUniformArray(boneCount * 3, mtxPalette, mVertexUniformLocation[VERTEX_UNIFORM_MTX_PALETTE], u32(-1));
 }
-
-#ifdef FFL_USE_ADJUST_MTX
-rio::Matrix34f g_MV = rio::Matrix34f::ident;
-#endif
 
 void Shader::setViewUniform(const rio::BaseMtx34f& model_mtx, const rio::BaseMtx34f& view_mtx, const rio::BaseMtx44f& proj_mtx) const
 {
@@ -720,13 +723,26 @@ void Shader::draw_(const FFLDrawParam& draw_param)
                 switch (type)
                 {
                 case FFL_ATTRIBUTE_BUFFER_TYPE_POSITION:
-                    RIO_GL_CALL(glVertexAttribPointer(location, 3, GL_FLOAT, false, stride, nullptr));
+                    // for some reason cullMode is 3 for 2D planes
+                    //if (draw_param.cullMode != FFL_CULL_MODE_MAX)
+                    if (stride > 0 && stride < 12)
+                        RIO_GL_CALL(glVertexAttribPointer(location, 3, GL_HALF_FLOAT, false, stride, nullptr));
+                    else
+                        RIO_GL_CALL(glVertexAttribPointer(location, 3, GL_FLOAT, false, stride, nullptr));
                     break;
                 case FFL_ATTRIBUTE_BUFFER_TYPE_TEXCOORD:
-                    RIO_GL_CALL(glVertexAttribPointer(location, 2, GL_FLOAT, false, stride, nullptr));
+                    if (stride > 0 && stride < 8)
+                    //if (draw_param.cullMode != FFL_CULL_MODE_MAX)
+                        RIO_GL_CALL(glVertexAttribPointer(location, 2, GL_HALF_FLOAT, false, stride, nullptr));
+                    else
+                        RIO_GL_CALL(glVertexAttribPointer(location, 2, GL_FLOAT, false, stride, nullptr));
                     break;
                 case FFL_ATTRIBUTE_BUFFER_TYPE_NORMAL:
-                    RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_INT_2_10_10_10_REV, true, stride, nullptr));
+                    //if (draw_param.cullMode != FFL_CULL_MODE_MAX)
+                        // use FFLiSnorm8_8_8_8
+                    //    RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_BYTE, true, 4, nullptr));
+                    //else
+                        RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_INT_2_10_10_10_REV, true, stride, nullptr));
                     break;
                 case FFL_ATTRIBUTE_BUFFER_TYPE_TANGENT:
                     RIO_GL_CALL(glVertexAttribPointer(location, 4, GL_BYTE, true, stride, nullptr));

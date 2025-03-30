@@ -169,7 +169,10 @@ void Model::drawXluNormal_()
     RIO_ASSERT(mpShader);
 
     rio::RenderState render_state;
-    render_state.setDepthEnable(true, false);
+    bool writeEnable = false;
+    if (reinterpret_cast<FFLiCharModel*>(mpCharModel)->charModelDesc.modelFlag & FFL_MODEL_FLAG_AFL_MODE)
+        writeEnable = true; // LUT shader handles depth testing.
+    render_state.setDepthEnable(true, writeEnable);
     render_state.setDepthFunc(rio::Graphics::COMPARE_FUNC_LESS);
     render_state.applyDepthAndStencilTest();
     mpShader->applyAlphaTestEnable();

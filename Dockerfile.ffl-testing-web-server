@@ -1,0 +1,8 @@
+FROM golang:1.21
+
+WORKDIR /app
+COPY server-impl .
+
+RUN go build .
+
+CMD ["./ffl-testing-web-server", "-upstream", "ffl-testing-renderer:12346", "-host", ":5000"]

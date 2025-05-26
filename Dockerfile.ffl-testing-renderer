@@ -1,0 +1,39 @@
+FROM debian:bookworm-slim
+
+# Install dependencies.
+# TODO: is OSMesa needed?
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    zlib1g-dev \
+    libgl1-mesa-dev \
+    libosmesa6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build FFL-Testing renderer.
+WORKDIR /app
+COPY . .
+
+# Build with custom GLFW.
+# Use no clip control for expanded support.
+# Use release mode and O3 optimizations.
+
+# TODO: Enable release mode at some point (should just disable logging)
+#-DCMAKE_BUILD_TYPE=Release \
+
+# TODO: You need to enable RIO_GLES for Raspberry Pi
+# or other systems that only support OpenGL ES 3.0.
+#-DRIO_GLES=ON \
+
+RUN cmake -S . -B build \
+    -DRIO_NO_CLIP_CONTROL=ON \
+    -DRIO_USE_HEADLESS_GLFW=ON \
+    -DCMAKE_CXX_FLAGS="-DNDEBUG -O3" && \
+    cmake --build build -j$(nproc)
+
+# TODO personal options:
+# -DFFL_USE_EXTRA_RESOURCES=ON -DUSE_SYSTEMD_SOCKET=ON -DFFL_USE_BROTLI=ON
+
+CMD ["./ffl_testing_2", "--server"]

@@ -3,6 +3,8 @@ Why is this in the FFL-Testing repo under another branch? This server is built o
 
 I keep telling myself that, after a rewrite, it can be moved into its own repo, so bare with me...
 
+**> There is also a `docker-compose.yml` if you prefer to use that and don't want to follow anything.** Use `docker-compose up`, cross your fingers, and it should be running at port 5000.
+
 1. Follow the instructions included below, which are also in master.
     * Get to the point where it shows you spinny Mii heads.
     * ... But if you are running on a server/headless system, see step 4.

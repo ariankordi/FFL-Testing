@@ -1,12 +1,15 @@
 cmake_minimum_required(VERSION 3.15)
 project(ffl_testing LANGUAGES CXX)
 
+include(FetchContent) # Use FetchContent for EGL headless version of GLFW.
+
 # ----------- Options -----------
 
 option(RIO_USE_GLEW "Use GLEW instead of GLAD (only if you have issues with it)" OFF)
 option(RIO_GLES "Build to target OpenGL ES 3.0 (Needed for Raspberry Pi, ANGLE, etc.)" OFF)
 option(RIO_NO_CLIP_CONTROL "Needed for compatibility with OpenGL versions prior to 4.5, or any GPU from before ~2015. Enable this if you have such a system or see upside down textures. This is enabled when using RIO_GLES." OFF)
-option(RIO_USE_OSMESA "Uses OSMesa, which provides off-screen rendering without having to run X11. Enable this if you are using a VPS, but not if your server has a GPU, OSMesa only uses software rendering." OFF)
+
+option(RIO_USE_HEADLESS_GLFW "Use version of GLFW patched to run headlessly via EGL, effectively allowing headless rendering without having to run X11. Enable this if you are running on a server/VPS." OFF)
 
 option(NO_GLTF "Disable glTF export feature" OFF)
 option(USE_SYSTEMD_SOCKET "Use systemd socket activation. Don't enable this if you don't know what it is." OFF)
@@ -74,9 +77,29 @@ endif()
 # ----------- External Dependencies -----------
 
 # RIO Dependencies ----------------------------
-find_package(glfw3 REQUIRED)
-if(NOT glfw3_FOUND)
-    message(FATAL_ERROR "GLFW3 is required but not found.")
+
+if(RIO_USE_HEADLESS_GLFW) # Conditionally fetch and use
+    message(STATUS "Using GLFW with EGL headless support (https://github.com/christopher-hesse/glfw)")
+
+    # Fetch fork of GLFW with EGL headless support.
+    FetchContent_Declare(
+        glfw
+        GIT_REPOSITORY https://github.com/christopher-hesse/glfw.git
+        GIT_TAG        fabd0cf2e0ddc553539cfe644efcbb51f20467b0  # Known working commit hash as of May 2025.
+    )
+
+    set(GLFW_USE_EGLHEADLESS ON CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE) # Disable unneeded docs.
+    # Tests and examples should be disabled from GLFW_STANDALONE being false.
+
+    FetchContent_MakeAvailable(glfw)
+
+else()
+    # Use system GLFW.
+    find_package(glfw3 REQUIRED)
+    if(NOT glfw3_FOUND)
+        message(FATAL_ERROR "GLFW3 is required but not found.")
+    endif()
 endif()
 
 if(RIO_USE_GLEW) # Use GLEW as an alternative to GLAD.
@@ -167,9 +190,9 @@ add_subdirectory(ffl) # Use FFL's CMakeLists.
 # Always disable controller support.
 target_compile_definitions(rio PRIVATE RIO_NO_CONTROLLERS_WIN)
 
-if(RIO_USE_OSMESA)
-    target_compile_definitions(rio PRIVATE RIO_USE_OSMESA)
-endif()
+#if(RIO_USE_OSMESA)
+#    target_compile_definitions(rio PRIVATE RIO_USE_OSMESA)
+#endif()
 
 # Needs to propagate to FFL:
 if(RIO_USE_GLEW)
@@ -227,6 +250,8 @@ if(NO_GLTF) # Disable glTF exporter/exclude tinygltf if it is not needed.
 endif()
 
 # Link libraries specific to main program.
+
+message(STATUS "RIO: GLFW source directory: ${glfw_SOURCE_DIR}") # Print version of GLFW used.
 
 if(USE_SYSTEMD_SOCKET AND SYSTEMD_FOUND)
     message(STATUS "FFL-Testing: systemd socket support enabled")

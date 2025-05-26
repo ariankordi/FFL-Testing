@@ -4,9 +4,8 @@ Why is this in the FFL-Testing repo under another branch? This server is built o
 I keep telling myself that, after a rewrite, it can be moved into its own repo, so bare with me...
 
 1. Follow the instructions included below, which are also in master.
-    * I don't think the server portion will work on a Wii U due to use of hardcoded OpenGL calls here, so don't try.
     * Get to the point where it shows you spinny Mii heads.
-    * ... But if you are running on a VPS/headless system, see step 4.
+    * ... But if you are running on a server/headless system, see step 4.
 2. The service requires two parts: the renderer, which is in ffl_testing_2, and the web server. You'll need to run either the Python or the Go web server.
     * Python
         - Needs Flask, also note that it's more limited in features and performance
@@ -15,11 +14,9 @@ I keep telling myself that, after a rewrite, it can be moved into its own repo, 
         - Inside `server-impl` just `go run .` or run the Go file
 3. Make sure FFL-Testing is running and listening, and try a request like this to the server: http://localhost:5000/miis/image.png?data=005057676b565c6278819697bbc3cecad3e6edf301080a122e303a381c235f4a52595c4e51494f585c5f667d848b96&width=512
 4. If that works, great! Keep these in mind:
-    - If you are hosting this, **always use the --server argument when running.**
-        * Hides the window, doesn't swap buffers, and pauses when idle.
-    - If you are running this on a VPS, build with **OSMesa support** so that you don't have to run an X11 server.
-        * Build and also pass in optimizations into CMake: `-DCMAKE_CXX_FLAGS="-O3 -march=native" -DRIO_USE_OSMESA=ON`
-        * Note that OSMesa does **NOT support hardware rendering**, and should only be used if you don't have a GPU! If you do, you'll need to constantly run Xvfb or something.
+    - When you are hosting this, **always use the --server argument when running.** It hides the window and pauses while idle.
+    - When running on a server, build with **headless GLFW** so that you don't have to run an X11 server.
+        * Build and also pass in optimizations into CMake: `-DCMAKE_CXX_FLAGS="-O3 -march=native" -DRIO_USE_HEADLESS_GLFW=ON`
 
 <details>
 <summary>
@@ -32,8 +29,8 @@ I keep telling myself that, after a rewrite, it can be moved into its own repo, 
     - Clone it like so: `git clone -b ffl-renderer-proto-integrate https://github.com/ariankordi/nwf-mii-cemu-toy`, build and run.
 * I recommend setting this up as a systemd _socket activated, instanced service._
     - This means you can run it like so: `systemctl start ffl-testing@31100` - where 31100 is the port number, which you can change, and also enable the service to start it at boot.
-    - **You will need to rebuild, once again**, with `USE_SYSTEMD_SOCKET` as a def.
-        * If you're following along on your VPS, it's this: `CXXFLAGS="-O3 -march=native" DEFS="-DRIO_USE_OSMESA -DUSE_SYSTEMD_SOCKET" make`
+    - **You will need to rebuild, once again**, with `USE_SYSTEMD_SOCKET` enabled.
+        * If you're following along on your server, it's this: `cmake -S . -B build -DCMAKE_CXX_FLAGS="-O3 -march=native" -DRIO_USE_HEADLESS_GLFW=ON -DUSE_SYSTEMD_SOCKET=ON`
     - Edit `ffl-testing@.service`. Adjust the `WorkingDirectory`, `ExecStart` (program path), and potentially user.
     - Copy the systemd units in this repo: `sudo cp ffl-testing@.service ffl-testing@.socket /etc/systemd/system/`
 </details>

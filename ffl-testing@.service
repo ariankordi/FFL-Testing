@@ -11,7 +11,45 @@ After=ffl-testing@%i.socket
 WorkingDirectory=/root/FFL-Testing
 ExecStart=/root/FFL-Testing/ffl_testing_2
 # --port/--server are assumed from LISTEN_FDS
-# TODO ADD SANDBOXING???
+
+# auto restart on failure
+Restart=always
+RestartSec=20
+
+# Sandbox setting.
+# NOTE: NOTE: If you are reading, and these sandboxing options cause problems...
+# ... feel free to remove all lines below this.
+PrivateTmp=false
+# Allow access to X socket.
+BindReadOnlyPaths=/tmp/.X11-unix
+
+ProtectSystem=strict
+ProtectHome=true
+# allow read access under /home
+ProtectHome=read-only
+NoNewPrivileges=true
+PrivateDevices=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=~CAP_SYS_ADMIN CAP_SYS_MODULE CAP_SYS_RAWIO
+DevicePolicy=closed
+DeviceAllow=/dev/null rw
+DeviceAllow=/dev/tty rw
+DeviceAllow=/dev/dri/card0 rw
+DeviceAllow=/dev/dri/renderD128 rw
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Allow paths. TODO: MUST BE CHANGED for your system.
+ReadWritePaths=/home/arian/FFL-Testing
+ReadOnlyPaths=/home/arian/libc-238-usr
+
 
 [Install]
 WantedBy=multi-user.target

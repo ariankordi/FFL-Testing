@@ -40,6 +40,25 @@ void mainLoop()
     // Swap the front and back buffers
     window->swapBuffers();
 }
+#else
+#include <csignal>
+void handleSignal(int signum)
+{
+    if (signum == SIGINT)
+    {
+        RIO_LOG("SIGINT received, exiting RIO...");
+
+        if (RootTask::sServerOnlyFlag != NULL)
+        {
+            rio::Exit(); // PROBABLY unsafe - returns right back to process
+            return;
+        }
+#ifndef RIO_NO_GLFW_CALLS
+        GLFWwindow* glfwWindow = rio::Window::instance()->getNativeWindow().getGLFWwindow();
+        glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
+#endif // RIO_NO_GLFW_CALLS
+    }
+}
 #endif
 
 #ifdef USE_SENTRY_DSN
@@ -103,6 +122,9 @@ int main(int argc, char* argv[])
     }
     else
     {
+        // Register SIGINT handler.
+        std::signal(SIGINT, handleSignal);
+
         // Main loop
         rio::EnterMainLoop();
     }

@@ -510,6 +510,8 @@ void RootTask::createModel_()
 
 const std::string socketErrorPrefix = "ERROR: ";
 
+const char* reqErrLogPrefix = "RenderRequest handle %d: ERROR: %s";
+
 // create model for render request
 bool RootTask::createModel_(RenderRequest* req, int socket_handle)
 {
@@ -530,7 +532,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         else
             errMsg = "Unknown data type (pickupCharInfoFromData failed)\n";
 
-        RIO_LOG("%s", errMsg.c_str());
+        RIO_LOG(reqErrLogPrefix, socket_handle, errMsg.c_str());
         errMsg = socketErrorPrefix + errMsg;
         send(socket_handle, errMsg.c_str(), static_cast<int>(errMsg.length()), 0);
         return false;
@@ -552,7 +554,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
             errMsg = "FFLiVerifyCharInfoWithReason (data verification) failed: "
             + std::string(FFLiVerifyReasonToString(verifyReason))
             + "\n";
-            RIO_LOG("%s", errMsg.c_str());
+            RIO_LOG(reqErrLogPrefix, socket_handle, errMsg.c_str());
             errMsg = socketErrorPrefix + errMsg;
             send(socket_handle, errMsg.c_str(), static_cast<int>(errMsg.length()), 0);
             return false;
@@ -561,7 +563,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         if (FFLiIsNullMiiID(&charInfo.creatorID))
         {
             errMsg = "FFLiIsNullMiiID returned true (this data will not work on a real console)\n";
-            RIO_LOG("%s", errMsg.c_str());
+            RIO_LOG(reqErrLogPrefix, socket_handle, errMsg.c_str());
             errMsg = socketErrorPrefix + errMsg;
             send(socket_handle, errMsg.c_str(), errMsg.length(), 0);
             return false;
@@ -570,7 +572,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         if (!FFLiIsValidMiiID(&charInfo.creatorID))
         {
             errMsg = "FFLiIsValidMiiID returned false (this data will not work on a real console)\n";
-            RIO_LOG("%s", errMsg.c_str());
+            RIO_LOG(reqErrLogPrefix, socket_handle, errMsg.c_str());
             errMsg = socketErrorPrefix + errMsg;
             send(socket_handle, errMsg.c_str(), errMsg.length(), 0);
             return false;
@@ -683,7 +685,7 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
         errMsg = "FFLInitCharModelCPUStep FAILED while initializing model: "
         + std::string(FFLResultToString(mpModel->getInitializeCpuResult()))
         + "\n";
-        RIO_LOG("%s", errMsg.c_str());
+        RIO_LOG(reqErrLogPrefix, socket_handle, errMsg.c_str());
         errMsg = socketErrorPrefix + errMsg;
         send(socket_handle, errMsg.c_str(), static_cast<int>(errMsg.length()), 0);
         delete mpModel;
@@ -971,7 +973,7 @@ static f32 getTransformedZ(const rio::BaseMtx34f model_mtx, const rio::BaseMtx34
 }
 
 // TODO: this is still using class instances: getBodyModel
-void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int socket)
+void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int socket_handle)
 {
     // Cast pModel. ppModel is provided so that
     // it can be deleted from inside this function
@@ -980,19 +982,24 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     if (pModel == nullptr)
     {
         // error was already sent by now?
-        closesocket(socket);
+        closesocket(socket_handle);
         return;
     }
-    RIO_LOG("handleRenderRequest: socket handle: %d\n", socket);
-
     //RIO_LOG("handleRenderRequest: socket handle: %d\n", socket);
+
+    RIO_LOG("RenderRequest handle %d: resolution=%d,instanceCount=%d,responseFormat=%d,dataLength=%d,expression=%d,shaderType=%d,verifyCharInfo=%d\n",
+        socket_handle,
+        req->resolution, req->instanceCount,
+        req->responseFormat, req->dataLength,
+        req->expression, req->shaderType,
+        req->verifyCharInfo);
 
     if (req->responseFormat == RESPONSE_FORMAT_GLTF_MODEL)
     {
 #ifndef NO_GLTF
-        ::handleGLTFRequest(req, pModel, socket);
+        ::handleGLTFRequest(req, pModel, socket_handle);
 #endif
-        closesocket(socket);
+        closesocket(socket_handle);
         return;
     }
 
@@ -1019,10 +1026,10 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
 
         rio::Texture2D* pTexture = pRenderTexture->pTexture2D;
 
-        writeTGAHeaderToSocket(socket, pTexture->getWidth(), pTexture->getHeight(), pTexture->getTextureFormat());
+        writeTGAHeaderToSocket(socket_handle, pTexture->getWidth(), pTexture->getHeight(), pTexture->getTextureFormat());
 
         // NOTE the resolution of this is the texture resolution so that would have to match what the client expects
-        copyAndSendRenderBufferToSocket(pTexture, socket, 1);
+        copyAndSendRenderBufferToSocket(pTexture, socket_handle, 1);
 
         // CharModel does not have shapes (maybe) and
         // should not be drawn anymore
@@ -1039,12 +1046,12 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
 #endif // FFL_ENABLE_NEW_MASK_ONLY_FLAG
 
 #endif // FFL_NO_RENDER_TEXTURE
-        closesocket(socket);
+        closesocket(socket_handle);
         return;
     }
 
 
-    RIO_LOG("instance count: %d\n", req->instanceCount);
+    //RIO_LOG("instance count: %d\n", req->instanceCount);
 
     s32 instanceTotal = 1;
 
@@ -1080,7 +1087,7 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         * aspectHeightFactor * instanceTotal)
     ) / 2) * 2);
 
-    RIO_LOG("Total resolution: %dx%d\n", totalWidth, totalHeight);
+    //RIO_LOG("Total resolution: %dx%d\n", totalWidth, totalHeight);
 
     bool hasWrittenTGAHeader = false;
 
@@ -1102,7 +1109,7 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     {
         f32 instanceAngle = instanceCurrent * instanceParts;
         f32 instanceAngleRad = rio::Mathf::deg2rad(instanceAngle);
-        RIO_LOG("instance %d rotation: %f (rad: %f)\n", instanceCurrent, instanceAngle, instanceAngleRad);
+        RIO_LOG("RenderRequest handle %d: instance %d (rotation=%f,radians=%f)\n", socket_handle, instanceCurrent, instanceAngle, instanceAngleRad);
 
         switch (req->instanceRotationMode)
         {
@@ -1203,7 +1210,7 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         rio::PerspectiveProjection projCopy = proj;
 
         const f32 zSplit = getTransformedZ(model_mtx, view_mtx);
-        RIO_LOG("z split: %f\n", zSplit);
+        RIO_LOG("RenderRequest handle %d: Z split point: %f\n", socket_handle, zSplit);
 
         if (splitMode == SPLIT_MODE_FRONT)
         {
@@ -1264,8 +1271,6 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     ) / 2) * 2; // to nearest even number
     s32 height = static_cast<s32>(fHeight);
 
-    RIO_LOG("Render buffer created with size: %dx%d\n", width, height);
-
     //rio::Window::instance()->getNativeWindow()->getColorBufferTextureFormat();
     rio::TextureFormat textureFormat = rio::TEXTURE_FORMAT_R8_G8_B8_A8_UNORM;
 #if RIO_IS_WIN && defined(TRY_BGRA_RENDERBUFFER_FORMAT)
@@ -1307,7 +1312,6 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     // Bind the render buffer.
     renderTexture.bind();
 
-    RIO_LOG("Render buffer bound.\n");
     // Enable depth writing and testing.
     rio::RenderState renderState;
     renderState.setDepthEnable(true, true);
@@ -1389,7 +1393,6 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         || drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK
         || drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
         pModel->drawOpa(view_mtx, projMtx);
-    RIO_LOG("drawOpa rendered to the buffer.\n");
 
     // draw headwear if it is not null
     if (pModel->mpHeadwear != nullptr)
@@ -1420,17 +1423,15 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     {
         pModel->drawXlu(view_mtx, projMtx);
     }
-    RIO_LOG("drawXlu rendered to the buffer.\n");
-
 
 #ifdef ENABLE_BENCHMARK
     std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
     start = std::chrono::high_resolution_clock::now();
 #endif
     if (!hasWrittenTGAHeader)
-        writeTGAHeaderToSocket(socket, totalWidth, totalHeight, renderTexture.getColorFormat());
+        writeTGAHeaderToSocket(socket_handle, totalWidth, totalHeight, renderTexture.getColorFormat());
 
-    copyAndSendRenderBufferToSocket(renderTexture.getColorTexture(), socket, ssaaFactor);
+    copyAndSendRenderBufferToSocket(renderTexture.getColorTexture(), socket_handle, ssaaFactor);
     hasWrittenTGAHeader = true;
 #ifdef ENABLE_BENCHMARK
     end = std::chrono::high_resolution_clock::now();
@@ -1455,8 +1456,8 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         goto instanceCountNewRender; // jump back earlier
     }
 
-    closesocket(socket);
-    RIO_LOG("Closed socket %d.\n", socket);
+    closesocket(socket_handle);
+    //RIO_LOG("Closed socket %d.\n", socket);
 }
 
 void RootTask::calc_()
@@ -1492,7 +1493,8 @@ void RootTask::calc_()
         }
         else
         {
-            RIO_LOG("got a request of length %i (should be %d), dropping\n", read_bytes, static_cast<u32>(RENDERREQUEST_SIZE));
+            // TODO: should show ip address i think
+            RIO_LOG("RenderRequest handle %d received with size %d (expected %d), closing\n", mServerSocket, read_bytes, static_cast<u32>(RENDERREQUEST_SIZE));
             closesocket(mServerSocket);
         }
     }
@@ -1525,7 +1527,7 @@ void RootTask::calc_()
 
             rio::Graphics::setViewport(0, 0, width, height);
             rio::Graphics::setScissor(0, 0, width, height);
-            RIO_LOG("Viewport and scissor reset to window dimensions: %dx%d\n", width, height);
+            //RIO_LOG("Viewport and scissor reset to window dimensions: %dx%d\n", width, height);
         }
         return;
     }
@@ -1597,14 +1599,12 @@ void RootTask::calc_()
 #ifndef NO_GLTF
 
 // exportAndSendGLTF
-void handleGLTFRequest(RenderRequest* req, Model* pModel, int socket)
+void handleGLTFRequest(RenderRequest* req, Model* pModel, int socket_handle)
 {
     // Initialize ExportShader
     GLTFExportCallback exportShader;
 
     exportShader.SetCharModel(pModel->getCharModel());
-
-    RIO_LOG("Created glTF export callback.\n");
 
     // Get the shader callback
     FFLShaderCallback callback = exportShader.GetShaderCallback();
@@ -1625,7 +1625,7 @@ void handleGLTFRequest(RenderRequest* req, Model* pModel, int socket)
         if (drawStages == DRAW_STAGE_MODE_ALL || drawStages == DRAW_STAGE_MODE_XLU_ONLY)
             FFLDrawXluWithCallback(pModel->getCharModel(), &callback);
     }
-    RIO_LOG("Drawn model to glTF callback data.\n");
+
     /*
     const std::time_t now = std::time(nullptr);
     std::ostringstream oss;
@@ -1641,7 +1641,7 @@ void handleGLTFRequest(RenderRequest* req, Model* pModel, int socket)
     // Export the GLTF model to the stream
     if (!exportShader.ExportModelToStream(&modelStream))
     {
-        RIO_LOG("Failed to export GLTF model to stream.\n");
+        RIO_LOG("RenderRequest handle %d: exportShader.ExportModelToStream failed.\n", socket_handle);
         return;
     }
 
@@ -1654,15 +1654,15 @@ void handleGLTFRequest(RenderRequest* req, Model* pModel, int socket)
     const unsigned long fileSize = modelData.size();
     while (totalSent < fileSize)
     {
-        long sent = send(socket, modelData.data() + totalSent, fileSize - totalSent, 0);
+        long sent = send(socket_handle, modelData.data() + totalSent, fileSize - totalSent, 0);
         if (sent < 0)
         {
-            RIO_LOG("Failed to send GLTF data\n");
+            RIO_LOG("RenderRequest handle %d: send() failed for glTF export.\n", socket_handle);
             return;
         }
         totalSent += sent;
     }
-    RIO_LOG("Wrote %lu bytes out to socket.\n", fileSize);
+    RIO_LOG("RenderRequest handle %d: returned %lu byte glTF model.\n", socket_handle, fileSize);
 }
 
 #endif // NO_GLTF

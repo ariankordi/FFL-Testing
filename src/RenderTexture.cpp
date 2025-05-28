@@ -255,7 +255,6 @@ void copyAndSendRenderBufferToSocket(rio::Texture2D* texture, int socket, int ss
     if (readBuffer)
     {
         // Process the data in readBuffer
-        RIO_LOG("Rendered data read successfully from the buffer.\n");
         send(socket, reinterpret_cast<char*>(readBuffer), bufferSize, 0);
         RIO_GL_CALL(glUnmapBuffer(GL_PIXEL_PACK_BUFFER));
     }
@@ -276,5 +275,5 @@ void copyAndSendRenderBufferToSocket(rio::Texture2D* texture, int socket, int ss
     delete[] readBuffer;
 #endif
 
-    RIO_LOG("Wrote %d bytes out to socket.\n", bufferSize);
+    //RIO_LOG("Wrote %d bytes out to socket.\n", bufferSize);
 }

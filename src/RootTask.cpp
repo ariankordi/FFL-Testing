@@ -680,6 +680,18 @@ bool RootTask::createModel_(RenderRequest* req, int socket_handle)
     if (req->shaderType < SHADER_TYPE_MAX)
         whichShader = static_cast<ShaderType>(req->shaderType);
 
+    // shortcut, check if one of the following are true:
+    // using default body type which is going to be fflbodyres
+    // or body type is fflbodyres
+    if ((req->bodyType == BODY_TYPE_DEFAULT_FOR_SHADER
+          && req->shaderType == SHADER_TYPE_WIIU_FFLICONWITHBODY)
+          || req->bodyType == BODY_TYPE_FFLBODYRES)
+    {
+        // this is roughly equivalent to no scale
+        charInfo.build = 82;
+        charInfo.height = 83;
+    }
+
     if (!mpModel->initialize(arg, *mpShaders[whichShader]))
     {
         errMsg = "FFLInitCharModelCPUStep FAILED while initializing model: "
@@ -1145,15 +1157,6 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     {
         // Initializes scale factors:
         pModel->mpBody->initialize(pModel, pantsColor);
-        // shortcut, check if one of the following are true:
-        // using default body type which is going to be fflbodyres
-        // or body type is fflbodyres
-        if ((req->bodyType == BODY_TYPE_DEFAULT_FOR_SHADER
-              && req->shaderType == SHADER_TYPE_WIIU_FFLICONWITHBODY)
-              || req->bodyType == BODY_TYPE_FFLBODYRES)
-        {
-            pModel->mpBody->setBodyScale({ 1.0f, 1.0f, 1.0f });
-        }
     }
 
     camera.pos() = position;

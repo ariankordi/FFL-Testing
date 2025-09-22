@@ -30,7 +30,7 @@ class BodyModelItem
 {
 public:
     BodyType              mType;
-    std::string           mName;
+    char                  mName[16];
     f32                   mScale;
     f32                   mHeadYTranslate;
     s32                   mHeadBoneID;
@@ -88,9 +88,11 @@ public:
                 RIO_ASSERT(item.mType == type);
             }
 
-            item.mName = "type"; // HACK: without this there's corruption on MSVC??? below vvv
             std::getline(ss, field, ',');
-                item.mName = field;
+                // Make sure name is not too long. Copy into field.
+                RIO_ASSERT(field.size() < sizeof(item.mName));
+                field.copy(item.mName, sizeof(item.mName), 0);
+                //item.mName = field;
 
             std::getline(ss, field, ',');
                 item.mScale = std::stof(field);
@@ -113,7 +115,7 @@ public:
                 item.mBones.resize(item.mBoneCount);
                 if (!item.loadSkeleton_())
                 {
-                    RIO_LOG("Failed to load skeleton for model %s, failing.\n", item.mName.c_str());
+                    RIO_LOG("Failed to load skeleton for model %s, failing.\n", item.mName);
                     return false;
                 }
             }
@@ -131,15 +133,14 @@ private:
     {
         for (u32 gender = 0; gender < FFL_GENDER_MAX; gender++)
         {
-            const char* bodyTypeString = mName.c_str();
             const char* genderString = cBodyGenderStrings[gender];
 
             char bodyPathC[128];
 
             if (useSkeleton())
-                snprintf(bodyPathC, sizeof(bodyPathC), cBodyFileNameFormat, bodyTypeString, genderString);
+                snprintf(bodyPathC, sizeof(bodyPathC), cBodyFileNameFormat, mName, genderString);
             else
-                snprintf(bodyPathC, sizeof(bodyPathC), cStaticBodyFileNameFormat, bodyTypeString, genderString);
+                snprintf(bodyPathC, sizeof(bodyPathC), cStaticBodyFileNameFormat, mName, genderString);
 
             RIO_LOG("%s, ", bodyPathC);
             const rio::mdl::res::Model* resModel = rio::mdl::res::ModelCacher::instance()->loadModel(bodyPathC, bodyPathC);
@@ -157,10 +158,9 @@ private:
     bool loadSkeleton_()
     {
         rio::FileDevice::LoadArg arg;
-        const char* bodyTypeString = mName.c_str();
 
         char pathC[256];
-        snprintf(pathC, sizeof(pathC), cBodySkeletonFileNameFormat, bodyTypeString);
+        snprintf(pathC, sizeof(pathC), cBodySkeletonFileNameFormat, mName);
         arg.path = pathC;
 
         // in fs/content

@@ -3,6 +3,17 @@
 #include <Types.h>
 #include <Model.h>
 
+#ifndef NO_GLTF
+#include <GLTFExportCallback.h>
+#include <gpu/rio_Drawer.h>
+#include <gfx/mdl/res/rio_MeshData.h>
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <utility>
+#endif
+
 #include <misc/rio_MemUtil.h>
 
 //BodyModel::BodyModel(rio::mdl::Model* pBodyModel, BodyType type)
@@ -473,3 +484,145 @@ rio::Vector3f BodyModel::calcBodyScale(f32 build, f32 height)
 
     return bodyScale;
 }
+
+#ifndef NO_GLTF
+namespace
+{
+    rio::Vector3f MultiplyPoint(const rio::Matrix34f& mtx, const rio::Vector3f& vec)
+    {
+        return {
+            mtx.m[0][0] * vec.x + mtx.m[0][1] * vec.y + mtx.m[0][2] * vec.z + mtx.m[0][3],
+            mtx.m[1][0] * vec.x + mtx.m[1][1] * vec.y + mtx.m[1][2] * vec.z + mtx.m[1][3],
+            mtx.m[2][0] * vec.x + mtx.m[2][1] * vec.y + mtx.m[2][2] * vec.z + mtx.m[2][3]
+        };
+    }
+
+    rio::Vector3f MultiplyVector(const rio::Matrix34f& mtx, const rio::Vector3f& vec)
+    {
+        return {
+            mtx.m[0][0] * vec.x + mtx.m[0][1] * vec.y + mtx.m[0][2] * vec.z,
+            mtx.m[1][0] * vec.x + mtx.m[1][1] * vec.y + mtx.m[1][2] * vec.z,
+            mtx.m[2][0] * vec.x + mtx.m[2][1] * vec.y + mtx.m[2][2] * vec.z
+        };
+    }
+}
+
+void BodyModel::exportToGLTF(GLTFExportCallback& exporter, const rio::Matrix34f& model_mtx)
+{
+    if (mpBodyModel == nullptr)
+        return;
+
+    const rio::mdl::Model* bodyModel = getBodyModel_();
+    if (bodyModel == nullptr)
+        return;
+
+    // Build the base matrix used for rendering the body in the realtime path.
+    rio::Matrix34f modelMtxBody = rio::Matrix34f::ident;
+    if (mUseSkeleton)
+        modelMtxBody.applyScaleLocal(mScale);
+    else
+        modelMtxBody.applyScaleLocal(mBodyScale);
+    modelMtxBody.setMul(model_mtx, modelMtxBody);
+
+    FFLiCharInfo* pCharInfo = mpModel->getCharInfo();
+    const FFLColor bodyColor = FFLGetFavoriteColor(pCharInfo->favoriteColor);
+
+    const rio::mdl::Mesh* meshes = bodyModel->meshes();
+    for (u32 meshIndex = 0; meshIndex < bodyModel->numMeshes(); ++meshIndex)
+    {
+        const bool isPantsMesh = ((meshIndex % 2) == 1);
+        if (isPantsMesh && mPantsColor == PANTS_COLOR_NO_DRAW_PANTS)
+            continue;
+
+        const rio::mdl::Mesh& mesh = meshes[meshIndex];
+        const rio::mdl::res::Mesh& resMesh = mesh.resMesh();
+
+        const auto& vtxBuf = resMesh.vertexBuffer();
+        const auto& idxBuf = resMesh.indexBuffer();
+        if (vtxBuf.count() == 0 || idxBuf.count() == 0)
+            continue;
+
+        GLTFExportCallback::MeshData meshData;
+        meshData.modulateMode = FFL_MODULATE_MODE_CONSTANT;
+        meshData.modulateType = static_cast<FFLModulateType>(isPantsMesh ? CUSTOM_MATERIAL_PARAM_PANTS : CUSTOM_MATERIAL_PARAM_BODY);
+        meshData.texture = nullptr;
+        meshData.cullMode = FFL_CULL_MODE_BACK;
+        meshData.primitiveType = rio::Drawer::TRIANGLES;
+
+        FFLColor modulateColor = bodyColor;
+        if (isPantsMesh && mPantsColor != PANTS_COLOR_SAME_AS_BODY && mPantsColor < PANTS_COLOR_COUNT)
+            modulateColor = cPantsColors[mPantsColor];
+        meshData.colorR = { modulateColor.r, modulateColor.g, modulateColor.b, modulateColor.a };
+
+        meshData.indices.reserve(idxBuf.count());
+        const u32* indexPtr = idxBuf.ptr();
+        for (u32 i = 0; i < idxBuf.count(); ++i)
+        {
+            const u32 index = indexPtr[i];
+            RIO_ASSERT(index <= std::numeric_limits<uint16_t>::max());
+            meshData.indices.push_back(static_cast<uint16_t>(index));
+        }
+
+        const rio::mdl::res::Vertex* vertexPtr = vtxBuf.ptr();
+        const u32 vertexCount = vtxBuf.count();
+        meshData.positions.resize(vertexCount * 3);
+        meshData.normals.resize(vertexCount * 3);
+        if (!mUseSkeleton)
+            meshData.texcoords.resize(vertexCount * 2);
+
+        for (u32 v = 0; v < vertexCount; ++v)
+        {
+            const rio::mdl::res::Vertex& vertex = vertexPtr[v];
+
+            const rio::Vector3f position { vertex.pos.x, vertex.pos.y, vertex.pos.z };
+            const rio::Vector3f normal { vertex.normal.x, vertex.normal.y, vertex.normal.z };
+
+            rio::Vector3f transformedPosition;
+            rio::Vector3f transformedNormal;
+
+            if (mUseSkeleton && mpBodyModel->mBoneCount > 0)
+            {
+                s32 boneIndex = static_cast<s32>(std::round(vertex.tex_coord.x));
+                boneIndex = std::clamp(boneIndex, 0, mpBodyModel->mBoneCount - 1);
+
+                rio::Matrix34f combined;
+                combined.setMul(modelMtxBody, mSkeletonMatrix[boneIndex]);
+
+                transformedPosition = MultiplyPoint(combined, position);
+                transformedNormal = MultiplyVector(combined, normal);
+            }
+            else
+            {
+                transformedPosition = MultiplyPoint(modelMtxBody, position);
+                transformedNormal = MultiplyVector(modelMtxBody, normal);
+
+                if (!meshData.texcoords.empty())
+                {
+                    meshData.texcoords[v * 2 + 0] = vertex.tex_coord.x;
+                    meshData.texcoords[v * 2 + 1] = vertex.tex_coord.y;
+                }
+            }
+
+            const f32 length = std::sqrt(transformedNormal.x * transformedNormal.x +
+                                        transformedNormal.y * transformedNormal.y +
+                                        transformedNormal.z * transformedNormal.z);
+            if (length > 0.0f)
+            {
+                transformedNormal.x /= length;
+                transformedNormal.y /= length;
+                transformedNormal.z /= length;
+            }
+
+            meshData.positions[v * 3 + 0] = transformedPosition.x;
+            meshData.positions[v * 3 + 1] = transformedPosition.y;
+            meshData.positions[v * 3 + 2] = transformedPosition.z;
+
+            meshData.normals[v * 3 + 0] = transformedNormal.x;
+            meshData.normals[v * 3 + 1] = transformedNormal.y;
+            meshData.normals[v * 3 + 2] = transformedNormal.z;
+        }
+
+        exporter.AddMeshData(std::move(meshData));
+    }
+}
+#endif // NO_GLTF

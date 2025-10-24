@@ -17,6 +17,9 @@
 #include <gfx/mdl/res/rio_ModelCacher.h>
 
 class Model;
+#ifndef NO_GLTF
+class GLTFExportCallback;
+#endif
 
 struct BodyBone
 {
@@ -248,6 +251,9 @@ public:
     static rio::Vector3f calcBodyScale(f32 build, f32 height);
     void draw(rio::Matrix34f& model_mtx, rio::BaseMtx34f& view_mtx,
     rio::BaseMtx44f& proj_mtx);
+#ifndef NO_GLTF
+    void exportToGLTF(GLTFExportCallback& exporter, const rio::Matrix34f& model_mtx);
+#endif
 private:
     rio::mdl::Model* getBodyModel_();
     void initializeSkeleton_();

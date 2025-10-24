@@ -10,6 +10,8 @@
 #include <cstdint>      // For fixed-width integer types
 #include <iostream>     // For std::ostream
 
+#include <math/rio_Matrix.h>
+
 // Include TinyGLTF
 #include "for_gltf/tiny_gltf.h"
 
@@ -69,6 +71,17 @@ public:
         return ExportModelInternal("", outStream);
     }
 
+    void SetRootTransform(const rio::Matrix34f& mtx)
+    {
+        mRootTransform = mtx;
+        mUseRootTransform = true;
+    }
+
+    void ResetRootTransform()
+    {
+        mUseRootTransform = false;
+    }
+
     // Data structures to collect the mesh data
     struct MeshData
     {
@@ -87,6 +100,11 @@ public:
         rio::Texture2D* texture;             ///< Pointer to the associated texture
         FFLCullMode cullMode;                ///< Culling mode
     };
+
+    /**
+     * @brief Appends mesh data gathered outside the FFL callbacks.
+     */
+    void AddMeshData(MeshData&& meshData);
 
 private:
     // Static callback functions matching FFLShaderCallback's function pointer types
@@ -349,4 +367,7 @@ private:
 
     // Texture management
     std::unordered_map<rio::Texture2D*, int> mTextureMap; ///< Maps Texture2D pointers to GLTF texture indices
+
+    rio::Matrix34f mRootTransform;
+    bool mUseRootTransform = false;
 };

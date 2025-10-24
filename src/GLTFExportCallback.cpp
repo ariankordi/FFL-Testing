@@ -2,6 +2,7 @@
 
 #include <GLTFExportCallback.h>
 #include <nn/ffl/FFLDrawParam.h>
+#include <IShader.h>
 #include <cstring>
 #include <limits>
 #include <cstdio>
@@ -11,6 +12,7 @@
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <utility>
 
 #include <misc/rio_MemUtil.h>
 
@@ -32,6 +34,24 @@ void strUTF16ToUTF8(char* dst, const u16* src, s32 n); // DataUtils.cpp
 
 namespace
 {
+    rio::Vector3f MultiplyPoint(const rio::Matrix34f& mtx, const rio::Vector3f& vec)
+    {
+        return {
+            mtx.m[0][0] * vec.x + mtx.m[0][1] * vec.y + mtx.m[0][2] * vec.z + mtx.m[0][3],
+            mtx.m[1][0] * vec.x + mtx.m[1][1] * vec.y + mtx.m[1][2] * vec.z + mtx.m[1][3],
+            mtx.m[2][0] * vec.x + mtx.m[2][1] * vec.y + mtx.m[2][2] * vec.z + mtx.m[2][3]
+        };
+    }
+
+    rio::Vector3f MultiplyVector(const rio::Matrix34f& mtx, const rio::Vector3f& vec)
+    {
+        return {
+            mtx.m[0][0] * vec.x + mtx.m[0][1] * vec.y + mtx.m[0][2] * vec.z,
+            mtx.m[1][0] * vec.x + mtx.m[1][1] * vec.y + mtx.m[1][2] * vec.z,
+            mtx.m[2][0] * vec.x + mtx.m[2][1] * vec.y + mtx.m[2][2] * vec.z
+        };
+    }
+
     // converts char* buffer to hex representation
     std::string charToHex(char* input, int len)
     {
@@ -122,6 +142,13 @@ namespace
 GLTFExportCallback::GLTFExportCallback()
 {
     mpCharModel = nullptr;
+    mRootTransform = rio::Matrix34f::ident;
+    mUseRootTransform = false;
+}
+
+void GLTFExportCallback::AddMeshData(MeshData&& meshData)
+{
+    mMeshes.push_back(std::move(meshData));
 }
 
 // Static function implementations
@@ -148,6 +175,22 @@ static const char* cMeshNames[FFL_MODULATE_TYPE_SHAPE_MAX] = {
     "XluNoseLine",
     "XluGlass"
 };
+
+static std::string GetMeshNameForModulateType(FFLModulateType type)
+{
+    if (type < FFL_MODULATE_TYPE_SHAPE_MAX)
+        return cMeshNames[type];
+
+    switch (type)
+    {
+    case static_cast<FFLModulateType>(CUSTOM_MATERIAL_PARAM_BODY):
+        return "Body";
+    case static_cast<FFLModulateType>(CUSTOM_MATERIAL_PARAM_PANTS):
+        return "Pants";
+    default:
+        return "Custom_" + std::to_string(static_cast<int>(type));
+    }
+}
 
 void GLTFExportCallback::DrawFunc(void* pObj, const FFLDrawParam* drawParam)
 {
@@ -524,6 +567,39 @@ void GLTFExportCallback::Draw(const FFLDrawParam& drawParam)
 
         meshData.primitiveType = static_cast<rio::Drawer::PrimitiveMode>(drawParam.primitiveParam.primitiveType);
 
+        if (mUseRootTransform)
+        {
+            for (u32 i = 0; i < vertexCount; ++i)
+            {
+                rio::Vector3f position {
+                    meshData.positions[i * 3 + 0],
+                    meshData.positions[i * 3 + 1],
+                    meshData.positions[i * 3 + 2]
+                };
+                position = MultiplyPoint(mRootTransform, position);
+                meshData.positions[i * 3 + 0] = position.x;
+                meshData.positions[i * 3 + 1] = position.y;
+                meshData.positions[i * 3 + 2] = position.z;
+
+                rio::Vector3f normal {
+                    meshData.normals[i * 3 + 0],
+                    meshData.normals[i * 3 + 1],
+                    meshData.normals[i * 3 + 2]
+                };
+                normal = MultiplyVector(mRootTransform, normal);
+                const f32 length = std::sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+                if (length > 0.0f)
+                {
+                    normal.x /= length;
+                    normal.y /= length;
+                    normal.z /= length;
+                }
+                meshData.normals[i * 3 + 0] = normal.x;
+                meshData.normals[i * 3 + 1] = normal.y;
+                meshData.normals[i * 3 + 2] = normal.z;
+            }
+        }
+
         // Store the meshData
         mMeshes.push_back(meshData);
     }
@@ -561,9 +637,8 @@ bool GLTFExportCallback::ExportModelInternal(const std::string& filename, std::o
         // Set primitive mode based on the mesh's primitive type
         primitive.mode = MapPrimitiveMode(meshData.primitiveType);
 
-        RIO_ASSERT(meshData.modulateType < FFL_MODULATE_TYPE_SHAPE_MAX); // do not include mask tex
         // Set name of mesh depending on modulate type
-        gltfMesh.name = cMeshNames[meshData.modulateType];
+        gltfMesh.name = GetMeshNameForModulateType(meshData.modulateType);
 
         // Add modulate parameters to this primitive's extras for custom usage
         AddPrimitiveExtras(meshData, primitive);

@@ -379,7 +379,7 @@ void RootTask::prepare_()
 
         mProjIconBody = rio::PerspectiveProjection(
             10.0f,
-            1000.0f,
+            1200.0f,
             rio::Mathf::deg2rad(15.0f),
             1.0f
         );
@@ -784,12 +784,15 @@ void RootTask::setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, 
                 fmod(static_cast<f32>(req->cameraRotate.z), 360),
             };*/
 
-            // FFLMakeIconWithBody view uses 37.05f, 415.53f
-            // below values are extracted from wii u mii maker
-            pCamera->pos() = { 0.0f, 34.0f, 411.181793f };
-                                  // 33.016785f
-            pCamera->at()  = { 0.0f, 34.3f, 0.0f };
-                                  // 33.016785f
+            // In Mii Maker, camera is at: 0.0f, 4.805f (4.205 + 0.6), 57.553f
+            // (From FUN_02086e94 in ffl_app.rpx, search for 57.553 / 0x42663646)
+            // But it's meant to be used with the body attached to the head at 0.14 scale
+            // as well as the camera moved up to the head (head Y - root Y)
+
+            // The values are divided by 0.14 (exact) to work for head scale.
+            const f32 s = 0.14f;
+            pCamera->pos() = { 0.0f, (4.805f / s), (57.553f / s) };
+            pCamera->at()  = { 0.0f, (4.805f / s), 0.0f };
             pCamera->setUp({ 0.0f, 1.0f, 0.0f });
             break;
         }
@@ -842,58 +845,38 @@ void RootTask::setViewTypeParams(ViewType viewType, rio::LookAtCamera* pCamera, 
 
             *isCameraPosAbsolute = true;
 
-            // NOTE: wii u mii maker does some strange
-            // camera zooming, to make the character
-            // bigger when it's shorter and smaller
-            // when it's taller, purely based on height
+            // wii u mii maker zooms the camera based on the body's height
+            // it interpolates the camera's Z position from a table
+            // the table varies for a few poses, but only the default is used here
+            // this is also from FUN_02086e94 in ffl_app.rpx, recipe indicates whole body flag is 1
 
-            // this is an ATTEMPT??? to simulate that
-            // via interpolation which is... meh
+            // These values are in the same order as the table values.
+            const f32 yOffset = 0.0f;
+            const f32 yFactor1 = 10.85f;
+            const f32 yFactor2 = 90.0f;
+            // const f32 fovy = 15.0f;
+            const f32 coefficientZMin = 0.85f;
+            const f32 coefficientZMax = 1.32f;
 
-            const f32 scaleFactorY = BodyModel::calcBodyScale(pCharInfo->build, pCharInfo->height).y;
+            const f32 height = pCharInfo->height;
 
-            // These camera parameters look right when the character is tallest
-            const rio::Vector3f posStart = { 0.0f, 65.0f, 550.0f };
-            const rio::Vector3f atStart = { 0.0f, 65.0f, 0.0f };
+            const f32 rootHeight = 0.0f; // I think this is always 0?
+            const f32 y = (yFactor1 - rootHeight) *
+                            (height / 64 * 0.15f + 0.85f) + rootHeight;
 
-            // Likewise these look correct when it's shortest.
-            const rio::Vector3f posEnd = { 0.0f, 75.0f, 850.0f };
-            const rio::Vector3f atEnd = { 0.0f, 88.0f, 0.0f };
+            // Height normalized to [-1, 1] range.
+            const f32 heightFactor = (height / 127 - 0.5f) * 2;
+            // Camera Z position / zoom.
+            f32 z = ((coefficientZMax + coefficientZMin) * 0.5f - 1.0f) * heightFactor *
+                      heightFactor + (coefficientZMax - coefficientZMin) * 0.5f * heightFactor + 1.0f;
+            z *= yFactor2;
 
-            // Calculate interpolation factor (normalized to range [0, 1])
-            f32 t = (scaleFactorY - 0.5f) / (1.264f - 0.5f);
-
-
-
-            // Interpolate between start and end positions
-            rio::Vector3f pos = {
-                posStart.x + t * (posEnd.x - posStart.x),
-                posStart.y + t * (posEnd.y - posStart.y),
-                posStart.z + t * (posEnd.z - posStart.z)
-            };
-
-            // Interpolate between start and end target positions
-            rio::Vector3f at = {
-                atStart.x + t * (atEnd.x - atStart.x),
-                atStart.y + t * (atEnd.y - atStart.y),
-                atStart.z + t * (atEnd.z - atStart.z)
-            };
-
-
-
-            // height = 127, 1.264
-            //pCamera->pos() = { 0.0f, 75.0f, 850.0f };
-            //pCamera->at() = { 0.0f, 88.0f, 0.0f }; // higher = model is lower
-            // height = 0,   0.5
-            //pCamera->pos() = { 0.0f, 65.0f, 550.0f }; // lower = closer
-            //pCamera->at() = { 0.0f, 65.0f, 0.0f };
-
-            pCamera->pos() = pos;
-            pCamera->at() = at;
-
-            //pCamera->pos() = { 0.0f, 9.0f, 900.0f };
-            //pCamera->at() = { 0.0f, 6.0f, 0.0f };
+            const f32 s = 0.14f; // Also divide by 0.14 like for head.
+            pCamera->pos() = { 0.0f, (y + yOffset) / s, z / s };
+            pCamera->at() = { 0.0f, (y + yOffset) / s, 0.0f };
             pCamera->setUp({ 0.0f, 1.0f, 0.0f });
+            // For some reason, lighting is slightly off compared
+            // to Mii Maker renders when camera is farther?
             break;
         }
         default:
@@ -1170,8 +1153,8 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     // apply rotation
     model_mtx.setMul(rio::Matrix34f::ident, rotationMtx);
 
-    rio::Matrix34f view_mtx;
-    camera.getMatrix(&view_mtx);
+    rio::Matrix34f viewMtx;
+    camera.getMatrix(&viewMtx);
 
     if (willDrawBody)
     {
@@ -1183,21 +1166,23 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         // note to self: this is matching more
         // with this: https://web.archive.org/web/20170521213000im_/https://cdn-mii.accounts.nintendo.com/1.0.0/miis/8ed7ef7660b3b2cf/image/1dd84ae2a599e70f-ebcc0c4f725b6b02.png?type=face&expression=normal&width=512&instanceCount=1&instanceRotationMode=model
         // but seemingly no rotation is done here?: https://debian.local:8445/assets/jasmine-sample-270-wiiu-no-aa.png
-
+/*
         if (!isCameraPosAbsolute)
         {
             rio::Matrix34f inverseModelMtx = rio::Matrix34f::ident;
             inverseModelMtx.setInverse(bodyHeadMatrix);
-            view_mtx.setMul(view_mtx, inverseModelMtx);
+            viewMtx.setMul(viewMtx, inverseModelMtx);
         }
-/*
+*/
         if (!isCameraPosAbsolute)
         {
             rio::Vector3f translate = pModel->mpBody->getHeadTranslation();
             // Translate at, if camera is NOT absolute
+            camera.pos().setAdd(camera.pos(), translate);
             camera.at().setAdd(camera.at(), translate);
+            camera.getMatrix(&viewMtx); // update camera matrix
         }
-*/
+
     }
 
     pModel->setMtxRT(model_mtx);
@@ -1212,7 +1197,7 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         // Copy projection matrix and set near/far on it.
         rio::PerspectiveProjection projCopy = proj;
 
-        const f32 zSplit = getTransformedZ(model_mtx, view_mtx);
+        const f32 zSplit = getTransformedZ(model_mtx, viewMtx);
         RIO_LOG("RenderRequest handle %d: Z split point: %f\n", socket_handle, zSplit);
 
         if (splitMode == SPLIT_MODE_FRONT)
@@ -1379,7 +1364,7 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
             // change favorite color after drawing opa
             pCharInfo->favoriteColor = FFLFavoriteColor(req->clothesColor);
 
-        pModel->mpBody->draw(rotationMtx, view_mtx, projMtx);
+        pModel->mpBody->draw(rotationMtx, viewMtx, projMtx);
         // restore original favorite color tho
         pCharInfo->favoriteColor = originalFavoriteColor;
     }
@@ -1395,12 +1380,12 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         || drawStages == DRAW_STAGE_MODE_OPA_ONLY
         || drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK
         || drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
-        pModel->drawOpa(view_mtx, projMtx);
+        pModel->drawOpa(viewMtx, projMtx);
 
     // draw headwear if it is not null
     if (pModel->mpHeadwear != nullptr)
     {
-        pModel->mpHeadwear->draw(model_mtx, view_mtx, projMtx);
+        pModel->mpHeadwear->draw(model_mtx, viewMtx, projMtx);
     }
 
     if (drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK)
@@ -1424,7 +1409,7 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
         || drawStages == DRAW_STAGE_MODE_XLU_DEPTH_MASK
         || drawStages == DRAW_STAGE_MODE_BODY_INV_DEPTH_MASK)
     {
-        pModel->drawXlu(view_mtx, projMtx);
+        pModel->drawXlu(viewMtx, projMtx);
     }
 
 #ifdef ENABLE_BENCHMARK
@@ -1693,3 +1678,4 @@ void RootTask::exit_()
 
     mInitialized = false;
 }
+

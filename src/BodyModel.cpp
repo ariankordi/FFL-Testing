@@ -356,6 +356,9 @@ rio::mdl::Model* BodyModel::getBodyModel_()
 // shader sets favorite and pants color
 void BodyModel::draw(rio::Matrix34f& model_mtx, rio::BaseMtx34f& view_mtx, rio::BaseMtx44f& proj_mtx)
 {
+    if (mpModel == nullptr)
+        return;
+
     //const BodyType bodyType = BODY_TYPE_WIIU_MIIBODYMIDDLE;
 
     const bool lightEnable = mpModel->getLightEnable();

@@ -1,5 +1,5 @@
 typeID,name,scale,headYTranslate,headBoneID,boneCount
-0,wiiu,7.0,0.0,14,25
+0,wiiu,7.14286,0.0,14,25
 1,switch,1.0,0.0,14,25
 2,miitomo,7.0,10.6,23,0
 3,fflbodyres,8.715,10.7766,-1,0
@@ -7,3 +7,5 @@ typeID,name,scale,headYTranslate,headBoneID,boneCount
 # miibodylow bones:  ^ 24
 # miitomo (smm2 skin): 45
 # (fflbodyres should be replaced)
+# note that wii u literally uses 0.14 for head-to-body scale
+# so making ours 7.1428... negates it when divided in absolute terms

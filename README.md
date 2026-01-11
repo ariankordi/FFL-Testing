@@ -1,10 +1,13 @@
 # Running the renderer server
-Why is this in the FFL-Testing repo under another branch? This server is built off of the FFL-Testing sample by Abood (or in other words, hackily patched from it).
+The reason this is in the FFL-Testing repo under another branch is that it's built off of [the FFL-Testing sample by Abood](https://github.com/aboood40091/FFL-Testing) - really, it's hackily patched from it.
 
-I keep telling myself that, after a rewrite, it can be moved into its own repo, so bare with me...
+In 2026 a rewrite is coming soon that will have its own built-in web server among other things, so bare with me, and try to make this a "modular" component of your "stack". Or whatever.
 
-**> There is also a `docker-compose.yml` if you prefer to use that and don't want to follow anything.** Use `docker-compose up`, cross your fingers, and it should be running at port 5000.
+**> There is also a `docker-compose.yml` if you prefer to use that.**
+* [Download the resource](#get-the-resource-file) to `FFLResHigh.dat` **before building** (sorry)
+* Use `docker-compose up`, cross your fingers, and it should be running at port 5000.
 
+### "Instructions"
 1. Follow the instructions included below, which are also in master.
     * Get to the point where it shows you spinny Mii heads.
     * ... But if you are running on a server/headless system, see step 4.
@@ -94,22 +97,20 @@ If you forgot or want to update, then after `git pull`, do this: `git submodule 
         - (be careful, make sure that really IS the folder you're deleting)
     * (On Visual Studio: As long as you have vcpkg configured and everything installed, it should? just work by loading the folder)
 
-3. Obtain the resource file, FFLResHigh.dat.
-    * This contains the meshes and textures needed to render Mii characters and is absolutely required to get anywhere with this.
-    * You can get it from many sources:
-        - It can be extracted from a Wii U using an FTP program:
-            - `sys/title/0005001b/10056000/content/FFLResHigh.dat`
-        - You can extract it from a Miitomo install (_it's not in the APK/IPA_):
-            - In cache (`Library/Application Support/cache` on iOS), here: `res/asset/model/character/mii/AFLResHigh_2_3.dat`
-        - It can also be downloaded from archive.org:
-            * https://web.archive.org/web/20180502054513/http://download-cdn.miitomo.com/native/20180125111639/android/v2/asset_model_character_mii_AFLResHigh_2_3_dat.zip
-            * Extract the above and rename `AFLResHigh_2_3.dat` to `FFLResHigh.dat`.
-        - (As well as `AFLResHigh_2_3.dat`, `AFLResHigh.dat` will work too. All AFL resources have to be renamed to `FFLResHigh.dat`.)
-        - In the Kadokawa breach, there is a Wii U tool called FFLUtility, located here: `dwango/projects/マルチデバイス/品証/WiiU/Tool/FFL/downloadimage/FFLUtilityJP_p01` - if you decrypt it with dev keys, then in `fs/content/nonproduct/miicapture/resource/`, you will find `FFLResPoster.dat`. This is a copy of FFLResHigh.dat with extremely high quality (512px) textures. If you successfully find this, share the love and enjoy.
-    * Place that file in the root of this repo.
-        - This file contains models and textures needed to render Miis and this program will not work without it.
+3. [Obtain the resource file](#get-the-resource-file).
+
 4. Run `ffl_testing_2`, and pray that it works.
     * If it crashes with a segfault or shows you a blank screen, make sure you have `FFLResHigh.dat` and it can open it.
+
+### Get the resource file
+* From Wii U or Miitomo:
+  - Miitomo: Download from archive.org:
+      * https://web.archive.org/web/20180502054513/http://download-cdn.miitomo.com/native/20180125111639/android/v2/asset_model_character_mii_AFLResHigh_2_3_dat.zip
+      * Extract the above and rename `AFLResHigh_2_3.dat` to `FFLResHigh.dat`.
+  * Wii U: Extract from MLC using an FTP program: `sys/title/0005001b/10056000/content/FFLResHigh.dat`
+    - ADVANCED: In the Kadokawa breach, there is a Wii U tool called FFLUtility, located here: `dwango/projects/マルチデバイス/品証/WiiU/Tool/FFL/downloadimage/FFLUtilityJP_p01` - if you decrypt it with dev keys, then in `fs/content/nonproduct/miicapture/resource/`, you will find `FFLResPoster.dat`. This is a copy of FFLResHigh.dat with extremely high quality (512px) textures. If you successfully find this, share the love and enjoy.
+* It **must be named** `FFLResHigh.dat` and placed in the root of this repo.
+  - This file contains models and textures needed to render Miis and this program will not work without it.
 
 ### Showing your own Miis
 As of 2024-06-14, I added a change that would let you change which Miis this program renders, by reading files in the `place_ffsd_files_here` folder.

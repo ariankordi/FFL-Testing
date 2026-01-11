@@ -48,7 +48,7 @@ void handleSignal(int signum)
     {
         RIO_LOG("SIGINT received, exiting RIO...");
 
-        if (RootTask::sServerOnlyFlag != NULL)
+        if (RootTask::sDisplayFlag == nullptr)
         {
             rio::Exit(); // PROBABLY unsafe - returns right back to process
             return;
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
     // never swapped, and the event loop will block on
     // accept() all day causing the process to "sleep"
 
-    if (RootTask::sServerOnlyFlag)
+    if (RootTask::sDisplayFlag == nullptr)
     {
         rio::Window* window = rio::Window::instance();
 
@@ -150,8 +150,8 @@ void parseArgv(int argc, char* argv[])
     {
         std::string arg = argv[i]; // use std::string for ==
 
-        if (arg == "--server" || arg == "-s")
-            RootTask::sServerOnlyFlag = argv[i];
+        if (arg == "--display" || arg == "-d")
+            RootTask::sDisplayFlag = argv[i];
             // note that if you do have a window and the
             // program blocks on accept(), next time it
             // calls swapBuffers() it may hang due on a
@@ -179,7 +179,7 @@ void parseArgv(int argc, char* argv[])
             RIO_LOG("Options:\n");
 
             // server options
-            RIO_LOG("  --server, -s = Run as a standalone server. Avoids maintaining window and uses minimal resources (pauses on accept())\n");
+            RIO_LOG("  --display, -d = Instead of running as a server, this will display a window that may be useful for debugging.\n");
             RIO_LOG("  --port, -p <port> = Set TCP server port (host is always localhost)\n");
 
             // resource options

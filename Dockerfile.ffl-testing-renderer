@@ -36,4 +36,4 @@ RUN cmake -S . -B build \
 # TODO personal options:
 # -DFFL_USE_EXTRA_RESOURCES=ON -DUSE_SYSTEMD_SOCKET=ON -DFFL_USE_BROTLI=ON
 
-CMD ["./ffl_testing_2", "--server"]
+CMD ["./ffl_testing_2"]

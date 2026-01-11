@@ -54,7 +54,7 @@ class RootTask : public rio::ITask
 public:
     RootTask();
     // Static members set to strings or nullptr.
-    static const char* sServerOnlyFlag;
+    static const char* sDisplayFlag;
     static const char* sServerPort;
 
     static const char* sResourceSearchPath;

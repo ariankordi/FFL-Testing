@@ -34,7 +34,7 @@ void handleGLTFRequest(RenderRequest* renderRequest, Model* pModel, int socket);
 #endif // NO_GLTF
 
 // Static members.
-const char* RootTask::sServerOnlyFlag     = nullptr;
+const char* RootTask::sDisplayFlag        = nullptr;
 const char* RootTask::sServerPort         = nullptr;
 const char* RootTask::sResourceSearchPath = nullptr;
 const char* RootTask::sResourceHighPath   = nullptr;
@@ -54,9 +54,6 @@ RootTask::RootTask()
     , mpModel(nullptr)
     , mHeadwearAvailable(false)
 {
-#ifdef RIO_USE_OSMESA // off screen rendering
-    sServerOnlyFlag = "1"; // force it truey
-#endif
     rio::MemUtil::set(mpBodyModels, 0, sizeof(mpBodyModels));
 }
 
@@ -123,7 +120,7 @@ void RootTask::setupSocket_()
             mSocketIsListening = true;
             RIO_LOG("\033[1mUsing systemd socket activation, socket fd: %d\033[0m\n", mServerFD);
 
-            sServerOnlyFlag = "1"; // force server only when using systemd socket
+            sDisplayFlag = nullptr; // force server only when using systemd socket
             return; // Exit the function as the socket is already set up
         }
         else
@@ -197,15 +194,11 @@ void RootTask::setupSocket_()
 
     else
     {
-#ifdef __APPLE__
-        char serverOnlyReminder[] = "\033[1mWARNING: On macOS, when the window is open the server will either fail to respond to requests or emit glitchy images. So, make sure to use the --server argument to hide the window.\n\033[0m";
-#else
-        char serverOnlyReminder[] = "\033[1mRemember to use the --server argument to hide the window.\n\033[0m";
-#endif
+
         // accept() blocks by default, this is needed
         // in server only mode but the mode will be
         // set to non-blocking without
-        if (!sServerOnlyFlag)
+        if (sDisplayFlag != nullptr)
         {
 #ifdef _WIN32
             u_long mode = 1; // cannot be const
@@ -214,18 +207,14 @@ void RootTask::setupSocket_()
             fcntl(mServerFD, F_SETFL, O_NONBLOCK);
 #endif // _WIN32
         }
-        else
-            // don't show the reminder with server only
-            serverOnlyReminder[0] = '\0';
 
         mSocketIsListening = true;
 
-        // print bold/blue, portReminder, serverOnlyReminder
+        // print bold/blue, portReminder
         RIO_LOG("\033[1m" \
         "tcp server listening on port %d\033[0m" \
-        "%s\n" \
-        "%s",
-        port, portReminder, serverOnlyReminder);
+        "%s\n",
+        port, portReminder);
     }
 }
 #endif
@@ -489,6 +478,7 @@ void RootTask::createModel_()
 
     //mpModel->mpHeadwear = new HeadwearModel(mHeadwearList.getByID(2));
     //mpModel->mpHeadwear->modifyCharInfoAndFlag(&charInfo, &arg.desc.modelFlag);
+    static const BodyType cBodyType = BODY_TYPE_MIITOMO;
     if (!mpModel->initialize(arg, *mpShaders[shaderType]))
     {
         delete mpModel;
@@ -499,11 +489,14 @@ void RootTask::createModel_()
         mpModel->setScale({ 1.f, 1.f, 1.f });
         //mpModel->setScale({ 1 / 16.f, 1 / 16.f, 1 / 16.f });
     }*/
-    static const BodyType cBodyType = BODY_TYPE_WIIU_MIIBODYMIDDLE;
-    mpModel->mpBody = new BodyModel(&mpBodyModels[cBodyType]);
-    mpModel->mpBody->initialize(mpModel, PANTS_COLOR_GRAY);
-    if (mpModel->mpHeadwear != nullptr)
-        mpModel->mpHeadwear->initialize(mpModel, FFLFavoriteColor(mpModel->getCharInfo()->favoriteColor));
+
+    else
+    {
+        mpModel->mpBody = new BodyModel(&mpBodyModels[cBodyType]);
+        mpModel->mpBody->initialize(mpModel, PANTS_COLOR_GRAY);
+        if (mpModel->mpHeadwear != nullptr)
+            mpModel->mpHeadwear->initialize(mpModel, FFLFavoriteColor(mpModel->getCharInfo()->favoriteColor));
+    }
 
     mCounter = 0.0f;
 }
@@ -1266,11 +1259,7 @@ void RootTask::handleRenderRequest(RenderRequest* req, Model** ppModel, int sock
     // however golang does not support this and png, jpeg, webp aren't using this anyway so
     textureFormat = rio::TEXTURE_FORMAT_B8_G8_R8_A8_UNORM;
 #elif RIO_IS_WIN //&& !defined(RIO_GLES) // not supported in gles core
-    if (req->responseFormat == RESPONSE_FORMAT_TGA_BGRA_FLIP_Y
-#ifdef RIO_GLES
-        && GLAD_GL_EXT_texture_format_BGRA8888
-#endif
-    )
+    if (req->responseFormat == RESPONSE_FORMAT_TGA_BGRA_FLIP_Y)
         textureFormat = rio::TEXTURE_FORMAT_B8_G8_R8_A8_UNORM;
 #endif
 
@@ -1491,7 +1480,7 @@ void RootTask::calc_()
         // otherwise just fall through and use default
         // when mii is directly in front of the camera
 #endif // RIO_IS_WIN
-        if (!sServerOnlyFlag && mCounter >= rio::Mathf::pi2())
+        if (sDisplayFlag != nullptr && mCounter >= rio::Mathf::pi2())
         {
             delete mpModel;
             createModel_();
@@ -1506,7 +1495,7 @@ void RootTask::calc_()
         // hopefully renderrequest is proper
         RenderRequest* req = reinterpret_cast<RenderRequest*>(buf);
         handleRenderRequest(req, &mpModel, mServerSocket);
-        if (!sServerOnlyFlag)
+        if (sDisplayFlag != nullptr)
         {
             rio::Window::instance()->makeContextCurrent();
 
@@ -1520,7 +1509,7 @@ void RootTask::calc_()
         return;
     }
 
-    if (!sServerOnlyFlag)
+    if (sDisplayFlag != nullptr)
     {
         rio::Window::instance()->clearColor(0.2f, 0.3f, 0.3f, 1.0f);
         rio::Window::instance()->clearDepthStencil();
@@ -1559,7 +1548,7 @@ void RootTask::calc_()
     mpModel->setMtxRT(model_mtx);
 
     // Increment the counter to gradually change the camera's position over time
-    if (!sServerOnlyFlag)
+    if (sDisplayFlag != nullptr)
     {
         mCounter += 1.f / 60;
     }

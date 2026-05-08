@@ -1,16 +1,15 @@
 [Unit]
 Description=ffl-testing on port %i
 
-Requires=ffl-testing@%i.socket
-After=ffl-testing@%i.socket
-
 [Service]
+User=arian
+# allow access to /dev/dri/renderD128
+# run to confirm: EGL_PLATFORM=surfaceless eglinfo -B -a glcore
+SupplementaryGroups=render
 
 # change this to wherever you run FFL-Testing
-# NOTE: don't run it as root!!!!!! but i did but you should not
-WorkingDirectory=/root/FFL-Testing
-ExecStart=/root/FFL-Testing/ffl_testing_2
-# --port/--server are assumed from LISTEN_FDS
+WorkingDirectory=/home/arian/FFL-Testing
+ExecStart=/home/arian/FFL-Testing/ffl_testing_2 --port %i
 
 # auto restart on failure
 Restart=always

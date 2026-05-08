@@ -1,8 +1,0 @@
-[Unit]
-Description=ffl-testing on port %i
-
-[Socket]
-ListenStream=127.0.0.1:%i
-
-[Install]
-WantedBy=sockets.target

@@ -34,7 +34,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictNamespaces=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
+#MemoryDenyWriteExecute=true # Breaks llvmpipe software rendering.
 RestrictRealtime=true
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
@@ -42,14 +42,14 @@ CapabilityBoundingSet=~CAP_SYS_ADMIN CAP_SYS_MODULE CAP_SYS_RAWIO
 DevicePolicy=closed
 DeviceAllow=/dev/null rw
 DeviceAllow=/dev/tty rw
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# Allow access to GPU devices.
 DeviceAllow=/dev/dri/card0 rw
 DeviceAllow=/dev/dri/renderD128 rw
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 # Allow paths. TODO: MUST BE CHANGED for your system.
 ReadWritePaths=/home/arian/FFL-Testing
 ReadOnlyPaths=/home/arian/libc-238-usr
-
 
 [Install]
 WantedBy=multi-user.target

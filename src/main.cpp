@@ -46,7 +46,7 @@ void handleSignal(int signum)
 {
     if (signum == SIGINT)
     {
-        RIO_LOG("SIGINT received, exiting RIO...");
+        printf("SIGINT received, exiting RIO...");
 
         if (RootTask::sDisplayFlag == nullptr)
         {
@@ -70,7 +70,7 @@ void initializeSentry()
 #ifndef SENTRY_RELEASE
     #define SENTRY_RELEASE "(SENTRY_RELEASE not set)"
 #endif
-    RIO_LOG("Initializing Sentry with DSN: %s, release: %s\n", USE_SENTRY_DSN, SENTRY_RELEASE);
+    printf("Initializing Sentry with DSN: %s, release: %s\n", USE_SENTRY_DSN, SENTRY_RELEASE);
 
     sentry_options_t *options = sentry_options_new();
 #if RIO_DEBUG
@@ -79,7 +79,7 @@ void initializeSentry()
     sentry_options_set_dsn(options, USE_SENTRY_DSN);
     sentry_options_set_release(options, SENTRY_RELEASE);
     const int result = sentry_init(options);
-    RIO_LOG("sentry_init result: %d\n", result);
+    printf("sentry_init result: %d\n", result);
 }
 #endif // USE_SENTRY_DSN
 
@@ -174,23 +174,22 @@ void parseArgv(int argc, char* argv[])
 
         else if (arg == "--help" || arg == "-h")
         {
-            RIO_LOG("Usage: %s [options]\n\n", argv[0]);
-            //RIO_LOG("--no-spin, -n = Disable rotation or spinning for on-screen heads (demo only).");
-            RIO_LOG("Options:\n");
+            printf("Usage: %s [options]\n\n", argv[0]);
+            //printf("--no-spin, -n = Disable rotation or spinning for on-screen heads (demo only).");
+            printf("Options:\n");
 
             // server options
-            RIO_LOG("  --display, -d = Instead of running as a server, this will display a window that may be useful for debugging.\n");
-            RIO_LOG("  --port, -p <port> = Set TCP server port (host is always localhost)\n");
+            printf("  --display, -d = Instead of running as a server, this will display a window that may be useful for debugging.\n");
 
             // resource options
-            RIO_LOG("  --resource-path <directory> = Set search path for FFLResMiddle.dat/FFLResHigh.dat.\n");
-            RIO_LOG("  --resource-high <file> = Set path for high resource file (e.g., AFLResHigh_2_3.dat)\n");
+            printf("  --resource-path <directory> = Set search path for FFLResMiddle.dat/FFLResHigh.dat.\n");
+            printf("  --resource-high <file> = Set path for high resource file (e.g., AFLResHigh_2_3.dat)\n");
 
             // show this help message
-            RIO_LOG("  --help, -h = Show this help message.\n");
+            printf("  --help, -h = Show this help message.\n");
             exit(0);
         }
         else
-            RIO_LOG("Unknown argument: \"%s\", ignoring.\n\n", argv[i]);
+            printf("Unknown argument: \"%s\", ignoring.\n\n", argv[i]);
     }
 }

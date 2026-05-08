@@ -11,6 +11,8 @@ SupplementaryGroups=render
 WorkingDirectory=/home/arian/FFL-Testing
 ExecStart=/home/arian/FFL-Testing/ffl_testing_2 --port %i
 
+Environment=EGL_PLATFORM=surfaceless
+
 # auto restart on failure
 Restart=always
 RestartSec=20
